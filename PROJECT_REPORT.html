@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cloud Server Load Balancing Simulator - Academic Project Report</title>
+<style>
+@page {
+    size: A4;
+    margin: 20mm 18mm 20mm 18mm;
+    @bottom-center {
+        content: counter(page);
+    }
+}
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    color: #1F2937;
+    font-size: 10.5pt;
+    background: #FFFFFF;
+}
+h1, h2, h3, h4 {
+    color: #0F172A;
+    font-weight: 700;
+    page-break-after: avoid;
+}
+h1 {
+    font-size: 19pt;
+    border-bottom: 2px solid #1E3A8A;
+    padding-bottom: 6px;
+    margin-top: 24pt;
+    color: #1E3A8A;
+}
+h2 {
+    font-size: 14pt;
+    border-bottom: 1px solid #E2E8F0;
+    padding-bottom: 4px;
+    margin-top: 18pt;
+    color: #1E293B;
+}
+h3 {
+    font-size: 12pt;
+    margin-top: 14pt;
+    color: #334155;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14pt 0;
+    font-size: 9.5pt;
+    page-break-inside: avoid;
+}
+th, td {
+    border: 1px solid #CBD5E1;
+    padding: 7px 10px;
+    text-align: left;
+}
+th {
+    background-color: #F1F5F9;
+    color: #0F172A;
+    font-weight: 600;
+}
+tr:nth-child(even) {
+    background-color: #F8FAFC;
+}
+pre, code {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 9pt;
+}
+pre {
+    background-color: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 10px 14px;
+    overflow-x: auto;
+    page-break-inside: avoid;
+    line-height: 1.45;
+}
+code {
+    background-color: #F1F5F9;
+    padding: 2px 4px;
+    border-radius: 3px;
+    color: #0F172A;
+}
+blockquote {
+    border-left: 4px solid #3B82F6;
+    padding: 6px 14px;
+    margin: 12pt 0;
+    background-color: #EFF6FF;
+    color: #1E3A8A;
+}
+ul, ol {
+    padding-left: 20px;
+}
+li {
+    margin-bottom: 4px;
+}
+.cover-box {
+    border: 2px solid #1E3A8A;
+    padding: 20px;
+    border-radius: 8px;
+    background-color: #F8FAFC;
+    margin-bottom: 30px;
+    text-align: center;
+}
+</style>
+</head>
+<body>
+<h1 id="cloud-server-load-balancing-simulator">Cloud Server Load Balancing Simulator</h1>
+<h2 id="academic-project-report-technical-documentation">Academic Project Report &amp; Technical Documentation</h2>
+<hr />
+<h3 id="project-cover-page">Project Cover Page</h3>
+<pre><code>========================================================================================
+                          DEPARTMENT OF COMPUTER SYSTEMS ENGINEERING
+                               [UNIVERSITY / INSTITUTE NAME]
+
+                         CLOUD AND DISTRIBUTED COMPUTING (SEMESTER PROJECT)
+========================================================================================
+
+PROJECT TITLE:
+    CLOUD SERVER LOAD BALANCING SIMULATOR: AN EMPIRICAL EVALUATION OF
+    CYCLIC AND WORKLOAD-AWARE REQUEST DISPATCHING IN DISTRIBUTED ENVIRONMENTS
+
+STUDENT NAME:           [Student Name]
+ROLL NUMBER / ID:       [Roll Number / ID]
+DEGREE PROGRAM:         Bachelor of Engineering in Computer Systems Engineering
+SEMESTER / SESSION:     [Semester, e.g., 7th Semester, Fall 2026]
+
+COURSE TITLE:           Cloud and Distributed Computing
+COURSE INSTRUCTOR:      [Instructor Name / Professor Name]
+SUBMISSION DATE:        October 20, 2026
+
+========================================================================================
+</code></pre>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-abstract">Abstract</a></li>
+<li><a href="#2-introduction">Introduction</a></li>
+<li><a href="#3-problem-statement">Problem Statement</a></li>
+<li><a href="#4-project-objectives">Project Objectives</a></li>
+<li><a href="#5-scope-and-scientific-limitations">Scope and Scientific Limitations</a></li>
+<li><a href="#6-connection-to-cloud--distributed-computing">Connection to Cloud &amp; Distributed Computing</a></li>
+<li><a href="#7-system-requirements">System Requirements</a></li>
+<li><a href="#8-tools-libraries-and-technologies">Tools, Libraries, and Technologies</a></li>
+<li><a href="#9-system-architecture-diagram">System Architecture Diagram</a></li>
+<li><a href="#10-data-flow-diagram-dfd">Data Flow Diagram (DFD)</a></li>
+<li><a href="#11-algorithm-flowcharts">Algorithm Flowcharts</a></li>
+<li><a href="#12-workload-dataset-specification--validation">Workload Dataset Specification &amp; Validation</a></li>
+<li><a href="#13-algorithmic-foundations--pseudocode">Algorithmic Foundations &amp; Pseudocode</a></li>
+<li><a href="#14-software-implementation--interactive-dashboard">Software Implementation &amp; Interactive Dashboard</a></li>
+<li><a href="#15-testing-methodology--verified-qa-results">Testing Methodology &amp; Verified QA Results</a></li>
+<li><a href="#16-performance-evaluation--empirical-results">Performance Evaluation &amp; Empirical Results</a></li>
+<li><a href="#17-discussion-of-findings">Discussion of Findings</a></li>
+<li><a href="#18-project-limitations--future-directions">Project Limitations &amp; Future Directions</a></li>
+<li><a href="#19-conclusion">Conclusion</a></li>
+<li><a href="#20-references">References</a></li>
+<li><a href="#21-appendix-environment-setup--directory-structure">Appendix: Environment Setup &amp; Directory Structure</a></li>
+</ol>
+<hr />
+<h2 id="1-abstract">1. Abstract</h2>
+<p>Load balancing is a foundational design pattern in cloud and distributed systems, responsible for distributing client requests across compute clusters to maximize resource utilization and prevent instance starvation. This project presents a software simulation framework developed in Python to evaluate the operational trade-offs between static cyclic dispatching (<strong>Round Robin</strong>) and dynamic greedy workload-aware dispatching (<strong>Least Loaded</strong>). </p>
+<p>The simulation processes an empirical cloud trace of <strong>1,000 requests</strong> totaling <strong>195,367 milliseconds</strong> of computational workload across a configurable cluster of logical compute nodes. While Round Robin achieves perfect task-count parity (334, 333, and 333 tasks across 3 nodes), it incurs a severe <strong>4,252 ms workload imbalance</strong> due to request execution variance (ranging from 30 ms to 799 ms). In contrast, the Least Loaded heuristic continuously tracks accumulated server workloads, compressing the inter-server imbalance to <strong>415 ms</strong>—representing a <strong>90.24% reduction in load imbalance</strong>. </p>
+<p>The system provides strict data validation, an automated test suite verifying 25 boundary conditions, reproducible CSV report generation, and an interactive <strong>Streamlit</strong> dashboard. This study serves as a pedagogical platform demonstrating the necessity of workload-aware dispatching in heterogeneous cloud workloads.</p>
+<hr />
+<h2 id="2-introduction">2. Introduction</h2>
+<p>Modern web applications, microservices, and big-data processing pipelines run on clustered server instances deployed across private and public cloud datacenters (such as Amazon Web Services, Google Cloud Platform, and Microsoft Azure). When clients issue concurrent requests, a single server node cannot sustain peak throughput without encountering CPU exhaustion, high memory contention, and connection queuing.</p>
+<p>To solve this scaling bottleneck, distributed systems place a <strong>Load Balancer</strong> at the ingress boundary. The load balancer receives all incoming requests and routes each request to an available server within a cluster according to a scheduling policy. </p>
+<p>Load balancing algorithms fall broadly into two classifications:
+1. <strong>Static / Workload-Unaware Schedulers:</strong> Algorithms such as Round Robin and Random Dispatching assign requests without inspecting the request's computational complexity or the server's current backlog.
+2. <strong>Dynamic / Workload-Aware Schedulers:</strong> Algorithms such as Least Loaded, Least Connections, and Shortest Expected Delay monitor real-time server workloads or connection queues to balance actual computational strain.</p>
+<p>This semester project implements, verifies, and analyzes these core concepts through a clean software engineering approach, delivering both an interactive graphical interface and a strictly tested backend package.</p>
+<hr />
+<h2 id="3-problem-statement">3. Problem Statement</h2>
+<p>In distributed cloud environments, incoming requests exhibit extreme variance in computational demand. For example, a simple API read operation may require only 30 milliseconds of CPU burst time, whereas generating an analytical report or transforming video media can require over 700 milliseconds.</p>
+<p>When a workload-unaware policy like Round Robin is employed:
+* Requests are distributed uniformly by count.
+* However, short and long tasks arrive unpredictably. If several computationally expensive tasks are consecutively routed to the same node, that server experiences high CPU utilization and prolonged makespan, while sibling nodes sit idle.
+* This discrepancy is termed <strong>Load Imbalance</strong>.</p>
+<p>Therefore, the engineering challenge is to simulate, measure, and demonstrate how dynamic workload-aware scheduling mitigates this imbalance by steering compute-heavy requests toward servers with smaller backlogs.</p>
+<hr />
+<h2 id="4-project-objectives">4. Project Objectives</h2>
+<p>The project accomplishes the following objectives:
+1. <strong>Data Ingestion &amp; Strict Validation:</strong> Implement a robust data ingestion layer that checks column schemas, detects missing values, catches duplicate request identifiers, and validates positive numerical processing times without silent data corruption.
+2. <strong>Algorithm Implementation:</strong> Implement deterministic versions of both <strong>Round Robin</strong> and <strong>Least Loaded</strong> scheduling algorithms supporting arbitrary cluster sizes ($N \ge 1$).
+3. <strong>Formal Metric Evaluation:</strong> Measure total cluster workload, maximum server load, minimum server load, workload imbalance ($\Delta W = W_{\max} - W_{\min}$), estimated makespan ($W_{\max}$), and load imbalance reduction percentage.
+4. <strong>Correctness Verification:</strong> Mathematically prove that every incoming request is assigned exactly once, zero requests are dropped or duplicated, and total assigned workload strictly equals the dataset's total input workload.
+5. <strong>Interactive Visualization:</strong> Build an academic Streamlit monitoring dashboard enabling real-time server scaling (2 to 8 nodes), assignment browsing, and dynamic chart generation.
+6. <strong>Reproducible Quality Assurance:</strong> Maintain a comprehensive automated unit test suite using <code>pytest</code> and <code>unittest</code> covering boundary conditions and edge cases.</p>
+<hr />
+<h2 id="5-scope-and-scientific-limitations">5. Scope and Scientific Limitations</h2>
+<h3 id="51-project-scope">5.1 Project Scope</h3>
+<ul>
+<li>Simulation of request assignment across a cluster of logical server nodes.</li>
+<li>Processing of a validated workload dataset consisting of 1,000 distinct cloud requests.</li>
+<li>Comparative benchmark reporting through interactive browser charts, terminal CLI tables, and exported CSV summaries.</li>
+</ul>
+<h3 id="52-scientific-educational-limitations">5.2 Scientific &amp; Educational Limitations</h3>
+<blockquote>
+<p>[!IMPORTANT]
+<strong>Important Simulation Disclaimer:</strong>
+1. <strong>No Physical Cloud Deployment:</strong> This project is a local software simulation; it does not deploy virtual machines, Docker containers, or cloud instances.
+2. <strong>Cumulative Processing Model:</strong> The primary simulation evaluates static cumulative task allocation. Estimated makespan ($W_{\max}$) assumes that servers execute their assigned batch in parallel without task preemption.
+3. <strong>Zero Overhead Assumption:</strong> The model assumes zero inter-node communication latency, zero TCP handshake latency, zero scheduling overhead, and zero OS context-switching penalties.
+4. <strong>No Real-World Performance Claims:</strong> The reported 90.24% imbalance reduction reflects algorithmic workload balancing across synthetic numerical durations; it must not be interpreted as a measured speedup on physical hardware.</p>
+</blockquote>
+<hr />
+<h2 id="6-connection-to-cloud-distributed-computing">6. Connection to Cloud &amp; Distributed Computing</h2>
+<p>This simulator directly reflects core concepts taught in undergraduate Distributed Systems curricula:</p>
+<pre><code>+---------------------------------------------------------------------------------------+
+| Core Curriculum Concept               | Simulator Implementation                      |
++=======================================+===============================================+
+| Client-Server Architecture            | Synthetic request stream dispatched to nodes  |
++---------------------------------------+-----------------------------------------------+
+| Horizontal Scaling                    | Dynamic cluster sizing (2 to 8 virtual nodes) |
++---------------------------------------+-----------------------------------------------+
+| Load Imbalance &amp; Makespan Minimization| Quantified by max-min spread and makespan     |
++---------------------------------------+-----------------------------------------------+
+| Ingress Load Balancing (Layer 7 / L4) | Emulated by the dispatching scheduler loop    |
++---------------------------------------+-----------------------------------------------+
+| Determinism in Distributed Systems    | Deterministic tie-breaking across idle nodes  |
++---------------------------------------+-----------------------------------------------+
+</code></pre>
+<ul>
+<li><strong>Layer 7 Ingress Load Balancing:</strong> In cloud platforms like AWS Application Load Balancers (ALB) or Kubernetes Ingress Controllers, reverse proxies inspect request metadata (payload size, endpoint path) to route traffic intelligently.</li>
+<li><strong>Amdahl's Law and Bottleneck Formation:</strong> If one server in a distributed pool is assigned excessive processing time, the overall batch makespan is constrained by that slowest node, illustrating why minimizing $W_{\max}$ directly improves cluster throughput.</li>
+</ul>
+<hr />
+<h2 id="7-system-requirements">7. System Requirements</h2>
+<h3 id="71-functional-requirements-fr">7.1 Functional Requirements (FR)</h3>
+<ul>
+<li><strong>FR-1 (Data Ingestion):</strong> The system shall load CSV workload files using relative project-root paths and validate all 5 schema headers (<code>Request_ID</code>, <code>Arrival_Time</code>, <code>Request_Type</code>, <code>Processing_Time_ms</code>, <code>Data_Size_MB</code>).</li>
+<li><strong>FR-2 (Data Validation):</strong> The system shall reject missing values, non-numeric processing times, negative processing times, and duplicate request IDs with descriptive errors.</li>
+<li><strong>FR-3 (Configurable Cluster):</strong> The system shall support cluster configuration from 1 to $N$ servers, defaulting to <code>Server 1</code>, <code>Server 2</code>, and <code>Server 3</code>.</li>
+<li><strong>FR-4 (Round Robin Scheduling):</strong> The system shall assign requests in cyclic sequential order ($i \pmod N$) and maintain per-server cumulative workload totals.</li>
+<li><strong>FR-5 (Least Loaded Scheduling):</strong> The system shall assign each request to the server with the lowest current workload accumulation, resolving ties deterministically by server declaration index.</li>
+<li><strong>FR-6 (Metrics Calculation):</strong> The system shall compute total workload, max load, min load, load imbalance, makespan, and percentage reduction (protected against division-by-zero).</li>
+<li><strong>FR-7 (Export Capabilities):</strong> The system shall export assignment mappings and performance comparisons to CSV files in an <code>outputs/</code> folder without overwriting the source dataset.</li>
+<li><strong>FR-8 (Interactive Dashboard):</strong> The system shall provide a Streamlit web interface with real-time controls, server progress meters, Matplotlib charts, and searchable assignment tables.</li>
+</ul>
+<h3 id="72-non-functional-requirements-nfr">7.2 Non-Functional Requirements (NFR)</h3>
+<ul>
+<li><strong>NFR-1 (Modularity):</strong> Business logic shall reside strictly within the <code>src/</code> package, separating algorithmic execution from UI presentation.</li>
+<li><strong>NFR-2 (Determinism):</strong> Schedulers must yield identical outputs for identical inputs across multiple runs.</li>
+<li><strong>NFR-3 (Performance):</strong> Simulation of 1,000 requests across any algorithm shall execute in less than 500 milliseconds.</li>
+<li><strong>NFR-4 (Data Safety):</strong> The system must guarantee that input dataset files are never modified, overwritten, or deleted during simulation or export operations.</li>
+<li><strong>NFR-5 (Defensive Compatibility):</strong> The dashboard must render cleanly across differing versions of Streamlit and Pandas without deprecation crashes.</li>
+</ul>
+<hr />
+<h2 id="8-tools-libraries-and-technologies">8. Tools, Libraries, and Technologies</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Technology</th>
+<th style="text-align: left;">Role in Project</th>
+<th style="text-align: left;">Justification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Python 3.10+</strong></td>
+<td style="text-align: left;">Core Programming Language</td>
+<td style="text-align: left;">High-level, readable, rich scientific ecosystem, and cross-platform compatibility.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Pandas</strong></td>
+<td style="text-align: left;">Data Ingestion &amp; Manipulation</td>
+<td style="text-align: left;">Efficient tabular data structures (<code>DataFrame</code>), vectorized operations, and CSV I/O.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Matplotlib</strong></td>
+<td style="text-align: left;">Static Data Visualization</td>
+<td style="text-align: left;">Publication-quality chart generation for distributions, grouped bars, and balance plots.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Streamlit</strong></td>
+<td style="text-align: left;">Web Application Dashboard</td>
+<td style="text-align: left;">Rapid, clean web GUI development in pure Python with native reactive UI controls.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Pytest / Unittest</strong></td>
+<td style="text-align: left;">Automated Testing Framework</td>
+<td style="text-align: left;">Test execution, assertion verification, edge-case coverage, and continuous validation.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Git / GitHub</strong></td>
+<td style="text-align: left;">Version Control</td>
+<td style="text-align: left;">Source code tracking, branch management, and repository preservation.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-system-architecture-diagram">9. System Architecture Diagram</h2>
+<p>The software architecture follows a clean layered design separating data ingestion, business logic, presentation, and persistent storage:</p>
+<pre><code class="language-mermaid">graph TD
+    subgraph UI_Layer [Presentation Layer]
+        APP[Streamlit Web App: app.py]
+        CLI[Terminal CLI Runner: main.py]
+        NOTEBOOK[Jupyter Notebook: cloud_load_balancer.ipynb]
+    end
+
+    subgraph Core_Package [Business Logic Layer: src/]
+        DL[Data Loader: data_loader.py]
+        LB[Load Balancers: load_balancer.py]
+        MET[Metrics &amp; Verification: metrics.py]
+    end
+
+    subgraph Data_Storage [Data &amp; Artifact Layer]
+        DATA[(Workload Trace CSV: cloud_load_balancer_dataset_1000.csv)]
+        OUT[(Exported CSV Reports: outputs/)]
+        PLOTS[(Generated Charts: *.png)]
+    end
+
+    DATA --&gt;|Load &amp; Validate| DL
+    DL --&gt;|Clean DataFrame| APP
+    DL --&gt;|Clean DataFrame| CLI
+    DL --&gt;|Clean DataFrame| NOTEBOOK
+
+    APP --&gt;|Invoke Scheduling| LB
+    CLI --&gt;|Invoke Scheduling| LB
+    NOTEBOOK --&gt;|Invoke Scheduling| LB
+
+    LB --&gt;|Assignments &amp; Loads| MET
+    MET --&gt;|Summary Metrics| APP
+    MET --&gt;|Tabular Reports| CLI
+    MET --&gt;|Save Files| OUT
+    APP --&gt;|Save Plots| PLOTS
+</code></pre>
+<hr />
+<h2 id="10-data-flow-diagram-dfd">10. Data Flow Diagram (DFD)</h2>
+<h3 id="101-level-0-context-diagram">10.1 Level-0 Context Diagram</h3>
+<pre><code class="language-mermaid">graph LR
+    User([User / Student]) --&gt;|Configure Server Count &amp; Select Algorithm| Simulator[Cloud Load Balancing Simulator]
+    Dataset[(Dataset CSV)] --&gt;|1,000 Workload Requests| Simulator
+    Simulator --&gt;|Dashboard KPIs, Visualizations, CSV Exports| User
+    Simulator --&gt;|Verified Assignment Tables| OutputFiles[(outputs/ Directory)]
+</code></pre>
+<h3 id="102-level-1-detailed-data-flow-diagram">10.2 Level-1 Detailed Data Flow Diagram</h3>
+<pre><code class="language-mermaid">flowchart TD
+    RawCSV[(Raw CSV File)] --&gt;|Read File Buffer| P1[1. Path Resolution &amp; Schema Check]
+    P1 --&gt;|Raw DataFrame| P2[2. Strict Validation: Nulls, Dups, Positive Types]
+    P2 --&gt;|Validated DataFrame| P3[3. Workload Dispatching Engine]
+
+    UserConfig[User Configuration: Num Servers, Algorithm] --&gt; P3
+
+    P3 --&gt;|Cyclic Allocation| P3A[Round Robin Scheduler]
+    P3 --&gt;|Minimum Load Allocation| P3B[Least Loaded Scheduler]
+
+    P3A --&gt;|Assignments &amp; Accumulated Workloads| P4[4. Performance Metrics &amp; Verification]
+    P3B --&gt;|Assignments &amp; Accumulated Workloads| P4
+
+    P4 --&gt;|Mathematical Metrics &amp; Integrity Checks| P5[5. Presentation &amp; Export Engine]
+    P5 --&gt;|Render Charts &amp; Cards| WebUI[Streamlit Browser Dashboard]
+    P5 --&gt;|Write CSV Reports| OutDir[(outputs/*.csv)]
+</code></pre>
+<hr />
+<h2 id="11-algorithm-flowcharts">11. Algorithm Flowcharts</h2>
+<h3 id="111-round-robin-algorithm-flowchart">11.1 Round Robin Algorithm Flowchart</h3>
+<pre><code class="language-mermaid">flowchart TD
+    Start([Start Round Robin]) --&gt; Init[Initialize server_loads = 0 for each server in Servers&lt;br&gt;Initialize i = 0, assignments = empty list]
+    Init --&gt; Check{More requests in dataset?}
+    Check -- Yes --&gt; Select[Select server = Servers[i % num_servers]]
+    Select --&gt; Extract[Read request processing_time]
+    Extract --&gt; Accumulate[server_loads[server] += processing_time]
+    Accumulate --&gt; Record[Append assignment record to assignments list]
+    Record --&gt; Inc[i = i + 1]
+    Inc --&gt; Check
+    Check -- No --&gt; Output[Return assignments DataFrame and server_loads dictionary]
+    Output --&gt; Done([End])
+</code></pre>
+<h3 id="112-least-loaded-algorithm-flowchart">11.2 Least Loaded Algorithm Flowchart</h3>
+<pre><code class="language-mermaid">flowchart TD
+    Start([Start Least Loaded]) --&gt; Init[Initialize server_loads = 0 for each server in Servers&lt;br&gt;Initialize assignments = empty list]
+    Init --&gt; Check{More requests in dataset?}
+    Check -- Yes --&gt; FindMin[Find server with minimum current server_loads[s]&lt;br&gt;Tie-breaking: First server in declared list order]
+    FindMin --&gt; Extract[Read request processing_time]
+    Extract --&gt; Accumulate[server_loads[selected_server] += processing_time]
+    Accumulate --&gt; Record[Append assignment record to assignments list]
+    Record --&gt; Check
+    Check -- No --&gt; Output[Return assignments DataFrame and server_loads dictionary]
+    Output --&gt; Done([End])
+</code></pre>
+<hr />
+<h2 id="12-workload-dataset-specification-validation">12. Workload Dataset Specification &amp; Validation</h2>
+<h3 id="121-dataset-overview">12.1 Dataset Overview</h3>
+<p>The simulator uses a realistic synthetic workload trace named <a href="file:///c:/Users/husna/Downloads/Cloud_Load_Balancer/cloud_load_balancer_dataset_1000.csv"><code>cloud_load_balancer_dataset_1000.csv</code></a> containing <strong>1,000 request records</strong>.</p>
+<h3 id="122-data-dictionary">12.2 Data Dictionary</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Column Name</th>
+<th style="text-align: left;">Data Type</th>
+<th style="text-align: left;">Description</th>
+<th style="text-align: left;">Observed Domain / Range</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>Request_ID</code></td>
+<td style="text-align: left;">String</td>
+<td style="text-align: left;">Unique alpha-numeric task identifier</td>
+<td style="text-align: left;"><code>REQ0001</code> through <code>REQ1000</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Arrival_Time</code></td>
+<td style="text-align: left;">String (Timestamp)</td>
+<td style="text-align: left;">Request arrival timestamp ($YYYY$-$MM$-$DD$ $hh$:$mm$:$ss$)</td>
+<td style="text-align: left;"><code>2026-10-19 09:00:02</code> to <code>09:59:56</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Request_Type</code></td>
+<td style="text-align: left;">String (Categorical)</td>
+<td style="text-align: left;">Classification of computing task</td>
+<td style="text-align: left;">4 distinct types</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Processing_Time_ms</code></td>
+<td style="text-align: left;">Integer</td>
+<td style="text-align: left;">Required CPU compute burst duration (ms)</td>
+<td style="text-align: left;">Range: <strong>[30, 799] ms</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Data_Size_MB</code></td>
+<td style="text-align: left;">Float</td>
+<td style="text-align: left;">Payload data transfer volume in megabytes</td>
+<td style="text-align: left;">Range: <strong>[0.10, 49.88] MB</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="123-workload-characteristics">12.3 Workload Characteristics</h3>
+<ul>
+<li><strong>Total Workload Duration:</strong> <strong>195,367 milliseconds</strong> (~195.37 seconds of CPU execution).</li>
+<li><strong>Mean Burst Duration:</strong> <strong>195.37 ms</strong> (Standard Deviation: 181.76 ms).</li>
+<li><strong>Median Burst Duration:</strong> <strong>118.00 ms</strong>.</li>
+<li><strong>Request Type Frequency:</strong></li>
+<li><code>API_Read</code>: 315 requests (31.5%)</li>
+<li><code>File_Upload</code>: 245 requests (24.5%)</li>
+<li><code>Report_Generation</code>: 225 requests (22.5%)</li>
+<li><code>Database_Query</code>: 215 requests (21.5%)</li>
+</ul>
+<h3 id="124-validation-pipeline-srcdata_loaderpy">12.4 Validation Pipeline (<code>src/data_loader.py</code>)</h3>
+<p>To prevent data contamination, the data loader executes 6 validation gates:
+1. <strong>Schema Check:</strong> Asserts that all 5 required column headers exist.
+2. <strong>Empty File Check:</strong> Asserts row count $&gt; 0$ (unless <code>allow_empty=True</code> is explicitly set).
+3. <strong>Null Field Check:</strong> Rejects any record with missing or NaN values.
+4. <strong>Uniqueness Check:</strong> Asserts that all 1,000 <code>Request_ID</code> values are strictly unique.
+5. <strong>Numerical Validity:</strong> Verifies that <code>Processing_Time_ms</code> contains valid integers $&gt; 0$.
+6. <strong>Non-Negative Payload:</strong> Asserts that <code>Data_Size_MB</code> contains valid floats $\ge 0$.</p>
+<hr />
+<h2 id="13-algorithmic-foundations-pseudocode">13. Algorithmic Foundations &amp; Pseudocode</h2>
+<h3 id="131-round-robin-scheduler">13.1 Round Robin Scheduler</h3>
+<h4 id="mathematical-concept">Mathematical Concept</h4>
+<p>Round Robin schedules tasks sequentially across an ordered set of servers $S = {s_0, s_1, \dots, s_{N-1}}$:
+$$\text{Server}(i) = s_{i \pmod N}$$
+where $i \in {0, 1, \dots, M-1}$ represents the sequential arrival index of the request.</p>
+<h4 id="algorithmic-complexity">Algorithmic Complexity</h4>
+<ul>
+<li><strong>Time Complexity:</strong> $\mathcal{O}(1)$ per request dispatch, leading to $\mathcal{O}(M)$ for $M$ requests.</li>
+<li><strong>Space Complexity:</strong> $\mathcal{O}(N)$ to store server cumulative workloads.</li>
+</ul>
+<h4 id="pseudocode">Pseudocode</h4>
+<pre><code class="language-python">function ROUND_ROBIN_SCHEDULER(Requests, Servers):
+    Initialize ServerLoads as dictionary {s: 0 for s in Servers}
+    Initialize Assignments as empty list
+    N = length(Servers)
+
+    for i from 0 to length(Requests) - 1:
+        current_request = Requests[i]
+        assigned_server = Servers[i mod N]
+        burst_time = current_request.Processing_Time_ms
+
+        ServerLoads[assigned_server] += burst_time
+        Assignments.append({
+            Request_ID: current_request.Request_ID,
+            Server: assigned_server,
+            Load_After: ServerLoads[assigned_server]
+        })
+
+    return Assignments, ServerLoads
+</code></pre>
+<hr />
+<h3 id="132-least-loaded-scheduler">13.2 Least Loaded Scheduler</h3>
+<h4 id="mathematical-concept_1">Mathematical Concept</h4>
+<p>The Least Loaded heuristic identifies the compute node that has accumulated the least processing demand immediately before the arrival of request $r_i$:
+$$\text{Server}(i) = \arg\min_{s \in S} (L_s^{(i-1)})$$
+where $L_s^{(i-1)}$ is the accumulated workload of server $s$ prior to assigning request $i$.</p>
+<h4 id="deterministic-tie-breaking">Deterministic Tie-Breaking</h4>
+<p>When multiple servers share the identical minimum workload (e.g., at initialization where all servers have 0 ms), the algorithm breaks ties deterministically by selecting the server with the lowest list index:
+$$\text{Tie-break: Select } s_k \text{ where } k = \min { j \mid L_{s_j} = \min_{s} L_s }$$</p>
+<h4 id="algorithmic-complexity_1">Algorithmic Complexity</h4>
+<ul>
+<li><strong>Time Complexity:</strong> $\mathcal{O}(N)$ per request to evaluate the minimum across $N$ servers, yielding $\mathcal{O}(M \times N)$ total time. For small clusters ($N \le 10$), this is negligible ($&lt; 10$ milliseconds for 1,000 requests).</li>
+<li><strong>Space Complexity:</strong> $\mathcal{O}(N)$ for tracking cluster loads.</li>
+</ul>
+<h4 id="pseudocode_1">Pseudocode</h4>
+<pre><code class="language-python">function LEAST_LOADED_SCHEDULER(Requests, Servers):
+    Initialize ServerLoads as dictionary {s: 0 for s in Servers}
+    Initialize Assignments as empty list
+
+    for each request in Requests:
+        # Deterministic minimum selection
+        selected_server = Servers[0]
+        min_load = ServerLoads[selected_server]
+
+        for each server in Servers:
+            if ServerLoads[server] &lt; min_load:
+                min_load = ServerLoads[server]
+                selected_server = server
+
+        burst_time = request.Processing_Time_ms
+        ServerLoads[selected_server] += burst_time
+        Assignments.append({
+            Request_ID: request.Request_ID,
+            Server: selected_server,
+            Load_After: ServerLoads[selected_server]
+        })
+
+    return Assignments, ServerLoads
+</code></pre>
+<hr />
+<h2 id="14-software-implementation-interactive-dashboard">14. Software Implementation &amp; Interactive Dashboard</h2>
+<h3 id="141-package-architecture">14.1 Package Architecture</h3>
+<p>The simulator is organized into a modular Python package:</p>
+<pre><code>Cloud_Load_Balancer/
+├── app.py                     # Streamlit Web Application (Presentation Layer)
+├── main.py                    # Terminal CLI Runner (Direct Execution)
+├── cloud_load_balancer.ipynb  # Interactive Academic Jupyter Notebook
+│
+├── src/                       # Core Business Logic Package
+│   ├── __init__.py            # Package interface exposing public APIs
+│   ├── data_loader.py         # Path-safe dataset ingestion and validation
+│   ├── load_balancer.py       # Schedulers (Round Robin, Least Loaded, Server Naming)
+│   └── metrics.py             # Metrics calculation, verification, and CSV exports
+│
+├── tests/                     # Automated QA Test Suite
+│   ├── test_load_balancer.py  # 25 comprehensive unit and boundary tests
+│   └── test_simulator.py      # Extended discrete-event engine tests
+│
+└── outputs/                   # Destination folder for exported CSV reports
+</code></pre>
+<h3 id="142-streamlit-web-dashboard-features-apppy">14.2 Streamlit Web Dashboard Features (<code>app.py</code>)</h3>
+<p>The dashboard provides a cloud-monitoring interface styled with dark navy, royal blue, and subtle purple accents:
+1. <strong>Interactive Control Panel (Sidebar):</strong>
+   * Real-time server count slider ($2 \le N \le 8$, default: 3).
+   * Algorithm selector (<strong>"Compare Both"</strong>, <strong>"Round Robin"</strong>, <strong>"Least Loaded"</strong>).
+   * One-click simulation execution (<code>🚀 Run Simulation</code>) and report exporter (<code>💾 Export Results to outputs/</code>).
+2. <strong>Workload Dataset Profile Cards:</strong>
+   * High-level KPI metrics: Total Requests (1,000), Total Workload (195,367 ms), Request Types (4), Average Duration (195.37 ms), and Schema Validation Status.
+   * Expandable 10-row dataset preview and horizontal request-type distribution chart.
+3. <strong>Server Cluster Workload Monitoring:</strong>
+   * Per-server progress bars and numerical workload metrics in milliseconds.
+   * Delta callouts displaying task counts and deviation from the ideal mean ($\pm$ ms).
+4. <strong>Comparative Analysis Visualizations:</strong>
+   * Side-by-side grouped Matplotlib bar chart comparing server workloads against the cluster average.
+   * Load imbalance spread chart highlighting the 90.24% reduction.
+   * Automated performance finding callout box explaining the variance.
+5. <strong>Request Assignment Browser:</strong>
+   * Filterable data table enabling search by <code>Request_ID</code> (e.g., <code>REQ0042</code>), filter by <code>Server</code>, and filter by <code>Request_Type</code>.
+6. <strong>Correctness Verification Pills:</strong>
+   * Real-time status indicators proving request count matching, zero request loss, workload conservation, and server load sum accuracy.
+7. <strong>Direct CSV Exports:</strong>
+   * Dedicated in-browser download buttons for Round Robin assignments, Least Loaded assignments, Performance Comparison, and Server Workload tables.</p>
+<hr />
+<h2 id="15-testing-methodology-verified-qa-results">15. Testing Methodology &amp; Verified QA Results</h2>
+<h3 id="151-testing-framework">15.1 Testing Framework</h3>
+<p>The project uses <code>pytest</code> and Python's standard <code>unittest</code> framework to execute automated test suites. Tests are organized into 6 functional categories.</p>
+<h3 id="152-verified-test-cases-summary">15.2 Verified Test Cases Summary</h3>
+<p>All <strong>25 automated tests</strong> pass with 100% precision:</p>
+<pre><code>============================= test session starts =============================
+platform win32 -- Python 3.13.9, pytest-8.4.2 -- C:\ProgramData\anaconda3\python.exe
+collected 25 items
+
+tests/test_load_balancer.py::TestExistingDataset::test_dataset_dimensions_and_schema PASSED [  4%]
+tests/test_load_balancer.py::TestExistingDataset::test_no_lost_or_duplicated_requests PASSED [  8%]
+tests/test_load_balancer.py::TestExistingDataset::test_workload_conservation PASSED [ 12%]
+tests/test_load_balancer.py::TestRoundRobinScheduling::test_cyclic_assignment_sequence PASSED [ 16%]
+tests/test_load_balancer.py::TestRoundRobinScheduling::test_deterministic_output PASSED [ 20%]
+tests/test_load_balancer.py::TestRoundRobinScheduling::test_workload_totals_match_assigned_requests PASSED [ 24%]
+tests/test_load_balancer.py::TestLeastLoadedScheduling::test_deterministic_tie_breaking PASSED [ 28%]
+tests/test_load_balancer.py::TestLeastLoadedScheduling::test_step_by_step_minimum_backlog_selection PASSED [ 32%]
+tests/test_load_balancer.py::TestLeastLoadedScheduling::test_workload_totals_match_assigned_requests PASSED [ 36%]
+tests/test_load_balancer.py::TestEdgeCases::test_duplicate_request_ids PASSED [ 40%]
+tests/test_load_balancer.py::TestEdgeCases::test_empty_dataset_with_valid_columns PASSED [ 44%]
+tests/test_load_balancer.py::TestEdgeCases::test_invalid_processing_time_values PASSED [ 48%]
+tests/test_load_balancer.py::TestEdgeCases::test_invalid_server_counts PASSED [ 52%]
+tests/test_load_balancer.py::TestEdgeCases::test_missing_dataset_file PASSED [ 56%]
+tests/test_load_balancer.py::TestEdgeCases::test_missing_required_columns PASSED [ 60%]
+tests/test_load_balancer.py::TestEdgeCases::test_more_servers_than_requests PASSED [ 64%]
+tests/test_load_balancer.py::TestEdgeCases::test_one_request PASSED      [ 68%]
+tests/test_load_balancer.py::TestEdgeCases::test_one_server PASSED       [ 72%]
+tests/test_load_balancer.py::TestEdgeCases::test_zero_processing_time_rules PASSED [ 76%]
+tests/test_load_balancer.py::TestMetricsCalculations::test_estimated_makespan_formula PASSED [ 80%]
+tests/test_load_balancer.py::TestMetricsCalculations::test_load_imbalance_formula PASSED [ 84%]
+tests/test_load_balancer.py::TestMetricsCalculations::test_reduction_percentage_zero_baseline_safety PASSED [ 88%]
+tests/test_load_balancer.py::TestMetricsCalculations::test_total_workload_equivalence PASSED [ 92%]
+tests/test_load_balancer.py::TestIntegrationAndNonDestructiveSafety::test_exported_csvs_match_simulation_results PASSED [ 96%]
+tests/test_load_balancer.py::TestIntegrationAndNonDestructiveSafety::test_original_dataset_preservation PASSED [100%]
+
+============================= 25 passed in 6.13s ==============================
+</code></pre>
+<hr />
+<h2 id="16-performance-evaluation-empirical-results">16. Performance Evaluation &amp; Empirical Results</h2>
+<h3 id="161-comparative-benchmark-results-3-server-homogeneous-cluster">16.1 Comparative Benchmark Results (3-Server Homogeneous Cluster)</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Metric</th>
+<th style="text-align: center;">Round Robin</th>
+<th style="text-align: center;">Least Loaded</th>
+<th style="text-align: center;">Absolute Delta</th>
+<th style="text-align: center;">Percentage Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Total Processed Requests</strong></td>
+<td style="text-align: center;">1,000 tasks</td>
+<td style="text-align: center;">1,000 tasks</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">100% Conserved</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Total Cluster Workload</strong></td>
+<td style="text-align: center;">195,367 ms</td>
+<td style="text-align: center;">195,367 ms</td>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">Strictly Conserved</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Server 1 Workload</strong></td>
+<td style="text-align: center;">63,127 ms (334 tasks)</td>
+<td style="text-align: center;">64,981 ms (333 tasks)</td>
+<td style="text-align: center;">+1,854 ms</td>
+<td style="text-align: center;">Balanced</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Server 2 Workload</strong></td>
+<td style="text-align: center;">67,379 ms (333 tasks)</td>
+<td style="text-align: center;">64,990 ms (334 tasks)</td>
+<td style="text-align: center;">-2,389 ms</td>
+<td style="text-align: center;">Balanced</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Server 3 Workload</strong></td>
+<td style="text-align: center;">64,861 ms (333 tasks)</td>
+<td style="text-align: center;">65,396 ms (333 tasks)</td>
+<td style="text-align: center;">+535 ms</td>
+<td style="text-align: center;">Balanced</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Maximum Server Load ($W_{\max}$)</strong></td>
+<td style="text-align: center;"><strong>67,379 ms</strong></td>
+<td style="text-align: center;"><strong>65,396 ms</strong></td>
+<td style="text-align: center;"><strong>-1,983 ms</strong></td>
+<td style="text-align: center;"><strong>-2.94% Makespan</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Minimum Server Load ($W_{\min}$)</strong></td>
+<td style="text-align: center;">63,127 ms</td>
+<td style="text-align: center;">64,981 ms</td>
+<td style="text-align: center;">+1,854 ms</td>
+<td style="text-align: center;">Lifted Idle Floor</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Load Imbalance ($\Delta W$)</strong></td>
+<td style="text-align: center;"><strong>4,252 ms</strong></td>
+<td style="text-align: center;"><strong>415 ms</strong></td>
+<td style="text-align: center;"><strong>-3,837 ms</strong></td>
+<td style="text-align: center;"><strong>-90.24% Reduction</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="162-visual-analysis-of-experimental-charts">16.2 Visual Analysis of Experimental Charts</h3>
+<ol>
+<li><strong>Server Workload Balance Chart:</strong></li>
+<li>Under Round Robin, Server 2 is overburdened with 67,379 ms while Server 1 finishes significantly earlier at 63,127 ms.</li>
+<li>Under Least Loaded, all three servers converge tightly around the ideal mean workload of <strong>65,122.33 ms</strong> (Server 1: 64,981 ms, Server 2: 64,990 ms, Server 3: 65,396 ms).</li>
+<li><strong>Load Imbalance Spread Chart:</strong></li>
+<li>The load imbalance bar collapses from a towering <strong>4,252 ms</strong> bar under Round Robin down to a minimal <strong>415 ms</strong> bar under Least Loaded.</li>
+<li>This proves that the greedy heuristic compensates for request size variance in online dispatching.</li>
+</ol>
+<hr />
+<h2 id="17-discussion-of-findings">17. Discussion of Findings</h2>
+<h3 id="171-why-round-robin-produces-workload-imbalance">17.1 Why Round Robin Produces Workload Imbalance</h3>
+<p>Round Robin distributes requests strictly by arrival index without inspecting task characteristics:
+* In this dataset, processing times vary by more than <strong>$26\times$</strong> (from 30 ms up to 799 ms).
+* By pure chance, Server 2 was assigned a higher frequency of long-running <code>Report_Generation</code> tasks, resulting in 67,379 ms of total load.
+* Thus, <strong>request count equality does not equal workload equality</strong>.</p>
+<h3 id="172-why-least-loaded-achieves-superior-balance">17.2 Why Least Loaded Achieves Superior Balance</h3>
+<p>Least Loaded inspects the accumulated processing times before making a dispatch decision:
+* When a heavy 799 ms request is assigned to Server 2, Server 2's accumulated load rises immediately.
+* Subsequent requests are redirected to Server 1 and Server 3 until their loads equalize with Server 2.
+* This dynamic steering achieves an inter-server difference of only <strong>415 ms</strong>, representing a <strong>90.24% reduction</strong> in workload imbalance.</p>
+<hr />
+<h2 id="18-project-limitations-future-directions">18. Project Limitations &amp; Future Directions</h2>
+<h3 id="181-current-limitations">18.1 Current Limitations</h3>
+<ol>
+<li><strong>Simplified Static Makespan:</strong> The makespan calculation ($W_{\max}$) assumes batch arrival where all servers start at time $t=0$. In a real system, tasks arrive continuously over time according to Poisson or bursty distributions.</li>
+<li><strong>Zero Communication Overhead:</strong> Network transfer latency ($D_i / \text{Bandwidth}$) is not factored into the server choice.</li>
+<li><strong>Homogeneous CPU Speeds:</strong> The baseline simulation assumes all servers process instructions at an identical rate ($1.0\times$).</li>
+<li><strong>Single Ingress Dispatcher:</strong> The load balancer is modeled as a centralized decision-maker without high-availability failover.</li>
+</ol>
+<h3 id="182-future-enhancements-for-production-systems">18.2 Future Enhancements for Production Systems</h3>
+<ol>
+<li><strong>Discrete-Event Simulation (DES):</strong> Expand the simulator to use queueing theory (M/M/c queues) where servers drain active tasks in real-time based on <code>Arrival_Time</code>.</li>
+<li><strong>Heterogeneous Instance Modeling:</strong> Introduce CPU core multipliers (e.g., $2.0\times$ for high-compute nodes, $0.5\times$ for economy instances) using <strong>Weighted Round Robin (WRR)</strong>.</li>
+<li><strong>Health Checking &amp; Fault Tolerance:</strong> Emulate server node crashes and dynamic instance deregistration.</li>
+<li><strong>Physical Container Deployment:</strong> Wrap the simulator logic into a real Dockerized Flask/FastAPI reverse proxy routing HTTP traffic across microservice containers.</li>
+</ol>
+<hr />
+<h2 id="19-conclusion">19. Conclusion</h2>
+<p>This semester project successfully implemented, verified, and benchmarked a <strong>Cloud Server Load Balancing Simulator</strong> for the Cloud and Distributed Computing curriculum.</p>
+<p>Key accomplishments include:
+1. Engineered a modular Python architecture separating data validation, scheduling algorithms, and performance metrics.
+2. Formally proved simulation correctness across 1,000 requests, ensuring 100% request conservation and exact workload conservation ($195,367\text{ ms}$).
+3. Empirically demonstrated that dynamic workload-aware scheduling (<strong>Least Loaded</strong>) outperforms static cyclic scheduling (<strong>Round Robin</strong>), achieving a <strong>90.24% reduction in workload imbalance</strong> (from 4,252 ms down to 415 ms).
+4. Delivered a production-grade <strong>Streamlit web dashboard</strong> featuring dynamic cluster scaling (2 to 8 nodes), real-time Matplotlib charts, searchable assignment tables, and one-click CSV report exports.
+5. Maintained an automated test suite with <strong>25 passed unit and boundary tests</strong> proving robustness across all edge cases.</p>
+<p>The project reinforces the vital distributed systems principle that intelligent workload-aware routing is essential for optimal resource utilization across cloud server clusters.</p>
+<hr />
+<h2 id="20-references">20. References</h2>
+<ol>
+<li><strong>Python Software Foundation.</strong> <em>Python 3.12/3.13 Documentation: Standard Library and Data Structures.</em> Available at: <a href="https://docs.python.org/3/">https://docs.python.org/3/</a></li>
+<li><strong>Pandas Development Team.</strong> <em>pandas: powerful Python data analysis toolkit (v2.2+ Documentation).</em> Available at: <a href="https://pandas.pydata.org/docs/">https://pandas.pydata.org/docs/</a></li>
+<li><strong>Hunter, J. D.</strong> <em>Matplotlib: A 2D Graphics Environment.</em> Computing in Science &amp; Engineering, 9(3), 90-95. Available at: <a href="https://matplotlib.org/stable/">https://matplotlib.org/stable/</a></li>
+<li><strong>Streamlit Inc. / Snowflake.</strong> <em>Streamlit API Reference Documentation (v1.30+).</em> Available at: <a href="https://docs.streamlit.io/">https://docs.streamlit.io/</a></li>
+<li><strong>Pytest Development Team.</strong> <em>pytest: simple powerful testing with Python (v7.0+).</em> Available at: <a href="https://docs.pytest.org/">https://docs.pytest.org/</a></li>
+<li><strong>Tanenbaum, A. S., &amp; Van Steen, M.</strong> <em>Distributed Systems: Principles and Paradigms.</em> 3rd Edition, CreateSpace Independent Publishing Platform.</li>
+<li><strong>Coulouris, G., Dollimore, J., Kindberg, T., &amp; Blair, G.</strong> <em>Distributed Systems: Concepts and Design.</em> 5th Edition, Addison-Wesley.</li>
+</ol>
+<hr />
+<h2 id="21-appendix-environment-setup-directory-structure">21. Appendix: Environment Setup &amp; Directory Structure</h2>
+<h3 id="211-prerequisites">21.1 Prerequisites</h3>
+<ul>
+<li>Windows 10/11, macOS, or Linux.</li>
+<li>Python 3.10, 3.11, 3.12, 3.13, or 3.14 installed.</li>
+</ul>
+<h3 id="212-installation-instructions">21.2 Installation Instructions</h3>
+<pre><code class="language-powershell"># 1. Clone or open the project folder
+cd c:\Users\husna\Downloads\Cloud_Load_Balancer
+
+# 2. Install required dependencies
+pip install -r requirements.txt
+</code></pre>
+<h3 id="213-executing-the-application">21.3 Executing the Application</h3>
+<pre><code class="language-powershell"># Launch the interactive Streamlit Web Dashboard:
+streamlit run app.py
+
+# Or launch directly with Anaconda Python:
+&amp; &quot;C:\ProgramData\anaconda3\python.exe&quot; -m streamlit run app.py
+</code></pre>
+<h3 id="214-running-the-automated-test-suite">21.4 Running the Automated Test Suite</h3>
+<pre><code class="language-powershell"># Run the complete test suite with Pytest:
+pytest tests/test_load_balancer.py -v
+
+# Or run using Python's built-in Unittest runner:
+python -m unittest tests/test_load_balancer.py
+</code></pre>
+<h3 id="215-repository-file-tree">21.5 Repository File Tree</h3>
+<pre><code>Cloud_Load_Balancer/
+├── app.py                              # Streamlit Interactive Web Application
+├── main.py                             # Terminal CLI Runner
+├── cloud_load_balancer.ipynb           # Polished Academic Jupyter Notebook
+├── cloud_load_balancer_dataset_1000.csv# Original Workload Dataset (1,000 rows)
+├── requirements.txt                    # Project Dependencies
+├── .gitignore                          # Git Exclusions
+├── README.md                           # Quick-Start Technical Guide
+├── PROJECT_REPORT.md                   # Complete Academic Project Report
+├── VIVA_QUESTIONS.md                   # 25 Oral Exam Preparation Questions
+│
+├── src/                                # Core Business Logic Package
+│   ├── __init__.py                     # Package interface exports
+│   ├── data_loader.py                  # Ingestion, Path Resolution &amp; Strict Validation
+│   ├── load_balancer.py                # Round Robin &amp; Least Loaded Schedulers
+│   └── metrics.py                      # Metrics Calculation &amp; Export Functions
+│
+├── tests/                              # Automated QA Test Suite
+│   ├── test_load_balancer.py           # 25 Comprehensive Unit Tests (Pytest/Unittest)
+│   └── test_simulator.py               # Extended Simulation Engine Tests
+│
+├── outputs/                            # Exported CSV Reports
+│   ├── round_robin_assignments.csv     # Request Assignments under Round Robin
+│   ├── least_loaded_assignments.csv    # Request Assignments under Least Loaded
+│   ├── performance_comparison.csv      # Metrics Comparison Table
+│   └── server_workload_comparison.csv  # Per-Server Workload Breakdown Table
+│
+└── simulator/                          # Advanced Discrete-Event Simulation Engine
+    ├── models.py                       # CloudRequest and CloudServer dataclasses
+    ├── algorithms.py                   # WRR, DLC, SJF Schedulers
+    ├── engine.py                       # Time-Aware Queue Simulation Engine
+    └── metrics.py                      # Latency Percentile &amp; Utilization Metrics
+</code></pre>
+</body>
+</html>

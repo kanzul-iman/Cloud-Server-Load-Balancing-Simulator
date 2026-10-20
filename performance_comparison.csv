@@ -1,0 +1,3 @@
+Algorithm,Total_Workload_ms,Maximum_Server_Load_ms,Minimum_Server_Load_ms,Load_Imbalance_ms,Estimated_Makespan_ms
+Round Robin,195367,67379,63127,4252,67379
+Least Loaded,195367,65396,64981,415,65396
