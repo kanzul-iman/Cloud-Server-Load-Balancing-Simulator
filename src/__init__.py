@@ -14,6 +14,8 @@ from .load_balancer import (
     generate_server_names,
     round_robin_scheduler,
     least_loaded_scheduler,
+    validate_request_inputs,
+    assign_single_request,
 )
 
 from .metrics import (
@@ -33,6 +35,8 @@ __all__ = [
     "generate_server_names",
     "round_robin_scheduler",
     "least_loaded_scheduler",
+    "validate_request_inputs",
+    "assign_single_request",
     "calculate_algorithm_metrics",
     "calculate_load_imbalance_reduction",
     "verify_simulation_correctness",

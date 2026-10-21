@@ -21,6 +21,8 @@ from src.load_balancer import (
     round_robin_scheduler,
     least_loaded_scheduler,
     DEFAULT_SERVERS,
+    validate_request_inputs,
+    assign_single_request,
 )
 from src.metrics import (
     calculate_algorithm_metrics,
@@ -424,6 +426,147 @@ class TestIntegrationAndNonDestructiveSafety(unittest.TestCase):
         self.assertEqual(list(raw_df.columns), REQUIRED_COLUMNS)
         self.assertEqual(raw_df.iloc[0]["Request_ID"], "REQ0001")
         self.assertEqual(raw_df.iloc[-1]["Request_ID"], "REQ1000")
+
+
+class TestAddNewRequestValidation(unittest.TestCase):
+    """TEST CASE 6: Verification of manual request validation rules."""
+
+    def test_valid_request_inputs(self):
+        """Verify properly formatted inputs pass validation."""
+        valid, err, cleaned = validate_request_inputs(
+            request_id="Request 1001",
+            request_type="API Read",
+            processing_time_ms=250,
+            data_size_mb=5.0,
+            existing_ids={"REQ0001"}
+        )
+        self.assertTrue(valid)
+        self.assertIsNone(err)
+        self.assertEqual(cleaned["Request_ID"], "Request 1001")
+        self.assertEqual(cleaned["Request_Type"], "API Read")
+        self.assertEqual(cleaned["Processing_Time_ms"], 250)
+        self.assertEqual(cleaned["Data_Size_MB"], 5.0)
+
+    def test_negative_or_zero_processing_time_rejected(self):
+        """Verify negative or 0 processing times are rejected with an error message."""
+        valid_neg, err_neg, _ = validate_request_inputs("Request 1001", "API Read", -50, 5.0)
+        self.assertFalse(valid_neg)
+        self.assertIn("Must be a positive number", err_neg)
+
+        valid_zero, err_zero, _ = validate_request_inputs("Request 1001", "API Read", 0, 5.0)
+        self.assertFalse(valid_zero)
+        self.assertIn("Must be a positive number", err_zero)
+
+    def test_negative_data_size_rejected(self):
+        """Verify negative data size is rejected."""
+        valid, err, _ = validate_request_inputs("Request 1001", "API Read", 100, -1.5)
+        self.assertFalse(valid)
+        self.assertIn("Cannot be negative", err)
+
+    def test_duplicate_request_id_rejected(self):
+        """Verify existing Request IDs cannot be duplicated."""
+        existing = {"REQ0001", "Request 1001"}
+        valid, err, _ = validate_request_inputs("Request 1001", "API Read", 100, 2.0, existing_ids=existing)
+        self.assertFalse(valid)
+        self.assertIn("already exists", err)
+
+    def test_empty_request_id_or_type_rejected(self):
+        """Verify blank Request ID or blank Request Type is rejected."""
+        valid_id, err_id, _ = validate_request_inputs("", "API Read", 100, 2.0)
+        self.assertFalse(valid_id)
+        self.assertIn("Request ID cannot be empty", err_id)
+
+        valid_type, err_type, _ = validate_request_inputs("Request 1001", "", 100, 2.0)
+        self.assertFalse(valid_type)
+        self.assertIn("Request Type must be selected", err_type)
+
+
+class TestDynamicSingleRequestAssignment(unittest.TestCase):
+    """TEST CASE 7: Verification of dynamic request assignment logic."""
+
+    def setUp(self):
+        self.df = load_and_validate_dataset()
+        self.servers = ["Server 1", "Server 2", "Server 3"]
+
+    def test_least_loaded_routes_to_minimum_backlog_server(self):
+        """
+        After initial 1,000-request simulation, verify a new request is assigned
+        to the server that currently has the minimum workload.
+        """
+        _, initial_loads = least_loaded_scheduler(self.df, self.servers)
+        min_server = min(self.servers, key=lambda s: initial_loads[s])
+        min_load_before = initial_loads[min_server]
+
+        new_req = {
+            "Request_ID": "Request 1001",
+            "Request_Type": "API Read",
+            "Processing_Time_ms": 250,
+            "Data_Size_MB": 5.0,
+        }
+
+        selected_srv, rec, updated_loads = assign_single_request(
+            request=new_req,
+            servers=self.servers,
+            current_loads=initial_loads,
+            strategy="Least Loaded"
+        )
+
+        self.assertEqual(selected_srv, min_server)
+        self.assertEqual(rec["Server"], min_server)
+        self.assertEqual(rec["Processing_Time_ms"], 250)
+        self.assertEqual(updated_loads[min_server], min_load_before + 250)
+
+    def test_round_robin_routes_cyclically(self):
+        """
+        Verify Round Robin single assignment adheres to cyclic sequence (index % N).
+        """
+        _, initial_loads = round_robin_scheduler(self.df, self.servers)
+        # 1,000 requests processed -> index 1000 % 3 = 1 -> Server 2
+        expected_server = self.servers[1000 % len(self.servers)]
+        expected_load_before = initial_loads[expected_server]
+
+        new_req = {
+            "Request_ID": "Request 1001",
+            "Request_Type": "File Upload",
+            "Processing_Time_ms": 180,
+            "Data_Size_MB": 12.0,
+        }
+
+        selected_srv, rec, updated_loads = assign_single_request(
+            request=new_req,
+            servers=self.servers,
+            current_loads=initial_loads,
+            strategy="Round Robin",
+            current_index=1000
+        )
+
+        self.assertEqual(selected_srv, expected_server)
+        self.assertEqual(rec["Server"], expected_server)
+        self.assertEqual(updated_loads[expected_server], expected_load_before + 180)
+
+    def test_consecutive_least_loaded_requests_rebalance(self):
+        """
+        Verify multiple consecutive requests re-evaluate server loads after each addition.
+        """
+        loads = {"Server 1": 1000, "Server 2": 1100, "Server 3": 1200}
+
+        # Request 1001 (500 ms) -> should go to Server 1 (lowest: 1000)
+        req1 = {"Request_ID": "Request 1001", "Request_Type": "API Read", "Processing_Time_ms": 500, "Data_Size_MB": 1.0}
+        srv1, _, loads = assign_single_request(req1, self.servers, loads, "Least Loaded")
+        self.assertEqual(srv1, "Server 1")
+        self.assertEqual(loads["Server 1"], 1500)
+
+        # Now loads: S1: 1500, S2: 1100, S3: 1200 -> next request should go to Server 2!
+        req2 = {"Request_ID": "Request 1002", "Request_Type": "API Read", "Processing_Time_ms": 200, "Data_Size_MB": 1.0}
+        srv2, _, loads = assign_single_request(req2, self.servers, loads, "Least Loaded")
+        self.assertEqual(srv2, "Server 2")
+        self.assertEqual(loads["Server 2"], 1300)
+
+        # Now loads: S1: 1500, S2: 1300, S3: 1200 -> next request should go to Server 3!
+        req3 = {"Request_ID": "Request 1003", "Request_Type": "API Read", "Processing_Time_ms": 100, "Data_Size_MB": 1.0}
+        srv3, _, loads = assign_single_request(req3, self.servers, loads, "Least Loaded")
+        self.assertEqual(srv3, "Server 3")
+        self.assertEqual(loads["Server 3"], 1300)
 
 
 if __name__ == "__main__":

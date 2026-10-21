@@ -312,21 +312,41 @@ The horizontal auto-scaler evaluates cluster metrics every $5.0\text{s}$:
 
 ---
 
-### 9.7 Automated Test Suite (54 Tests)
-Run the entire comprehensive test suite covering all 20 specified scenarios:
+### 9.7 Automated Test Suite (62 Tests)
+Run the entire comprehensive test suite covering all specified unit, edge case, and dynamic dispatch scenarios:
 
 ```bash
 python -m pytest -v
 ```
 
 ```
-collected 54 items
-tests/test_adaptive_algorithm.py ......                                  [ 11%]
-tests/test_autoscaler.py .....                                           [ 20%]
-tests/test_chaos_engine.py ..........                                    [ 38%]
-tests/test_load_balancer.py .........................                    [ 85%]
-tests/test_recovery.py ....                                              [ 92%]
+collected 62 items
+tests/test_adaptive_algorithm.py ......                                  [ 10%]
+tests/test_autoscaler.py .....                                           [ 18%]
+tests/test_chaos_engine.py ..........                                    [ 34%]
+tests/test_load_balancer.py .................................            [ 87%]
+tests/test_recovery.py ....                                              [ 94%]
 tests/test_simulator.py ....                                             [100%]
-============================== 54 passed in 6.29s ==============================
+============================== 62 passed in 8.33s ==============================
 ```
+
+---
+
+## 10. Dynamic Request Dispatcher & Responsive UI Architecture
+
+### 10.1 Interactive "Add New Request" Feature
+- **Automatic Request ID Generation:** Defaults sequentially to the next integer ID (`Request_1001`, `1002`, `1003`...) while permitting custom IDs with instant collision prevention.
+- **Dynamic Dual Dispatch:** Every new request is synchronously routed across both Round Robin (strict cyclic index rotation) and Least Loaded (minimum cumulative duration with deterministic tie-breaking).
+- **Session State Persistence:** Workloads, task counts, and dispatch logs are stored in `st.session_state.simulation_state` across reruns.
+- **Strict Invariant Verification:** Newly added requests dynamically join the verification dataset so that all mathematical conservation invariants remain verified.
+
+### 10.2 Responsive & Organized UI Design
+- **Mobile, Tablet, & Desktop Fluid Layouts:** CSS `clamp()` typography, responsive column wrapping (`flex-wrap: wrap`), and auto-scaling metric cards ensure clean visibility on any screen size without horizontal truncation.
+- **Quick-Jump Anchor Navigation:** Sticky horizontal navigation bar allowing 1-click jumps to any numbered section (`#section-1` through `#section-7`).
+- **Interactive Educational Guides:** Collapsible explanation panels explaining Key Performance Indicators, cloud request types, and mathematical conservation proofs.
+
+### 10.3 Cloud Chaos Lab: Guided Scenarios & Failover Lifecycle Inspector
+- **🎯 5 Guided Disaster Scenarios:** Pre-packaged experiments (Normal Baseline, Single Node Crash & Automated Failover, Traffic Surge + CPU Throttling, Compound Disaster Cascade, and Total Cluster Outage & Buffer Drain) that automatically configure parameters and inject planned failures.
+- **💡 "Where Changes Happen" Educational Guide:** Breaks down the exact cause-and-effect across Cluster Server Blades, Real-Time Telemetry KPIs, Ingress Router/Recovery Manager, and the Live Audit Timeline.
+- **🔍 Live Incident & Failover Lifecycle Inspector:** Interactive 5-stage pipeline visualizer (Fault Trigger ➔ Detection ➔ Task Harvest ➔ Reassignment ➔ Zero-Loss Completion) paired with a live manifest table detailing which tasks were rescued, their failover destination, wasted CPU milliseconds, and retry status.
 

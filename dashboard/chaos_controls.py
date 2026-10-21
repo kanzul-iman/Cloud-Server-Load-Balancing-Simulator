@@ -45,7 +45,8 @@ def render_chaos_controls(engine: ChaosSimulationEngine) -> None:
                 if st.button("💥 Crash Selected Server", type="primary", use_container_width=True):
                     success = engine.inject_server_crash(selected_server_id)
                     if success:
-                        st.toast(f"🚨 Dispatched failure event for Server {selected_server_id}!", icon="💥")
+                        engine.step()  # Process failure event immediately at current time
+                        st.toast(f"🚨 Server {selected_server_id} has crashed! Failure detection in progress.", icon="💥")
                         st.rerun()
         else:
             st.error("All servers are currently failed! Cluster is in a total outage state.")
@@ -102,6 +103,7 @@ def render_chaos_controls(engine: ChaosSimulationEngine) -> None:
                 st.write("")
                 if st.button("📉 Apply CPU Throttling", use_container_width=True):
                     engine.inject_server_degradation(deg_server_id, deg_level)
+                    engine.step()  # Apply degradation event immediately
                     st.toast(f"⚡ Throttled Server {deg_server_id} to {int(deg_level*100)}% speed!", icon="⚡")
                     st.rerun()
         else:

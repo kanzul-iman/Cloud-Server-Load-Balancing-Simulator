@@ -32,10 +32,29 @@ def render_event_timeline(logger: EventLogger) -> None:
         sev_filter = st.selectbox(
             "Filter by Severity:",
             options=["All Events", "Warnings & Failures Only", "Success & Normal Only"],
-            index=0
+            key="timeline_sev_filter",
+            help="Select which event severity levels to display."
         )
     with f_col2:
-        search_kw = st.text_input("Search Event Description:", value="", placeholder="e.g. Server 2, retry, crash").strip().lower()
+        search_kw = st.text_input(
+            "Search Event Description:",
+            key="timeline_search_kw",
+            placeholder="e.g. Server 1, crash, retry, spike"
+        ).strip()
+
+    st.caption("💡 *Severity Guide:* 🚨 **Critical** (Crashes, outages) • ⚠️ **Warning** (Throttling, failovers) • ✔ **Success** (Recoveries) • ℹ️ **Info** (Telemetry, scale-ins)")
+
+    with st.expander("💡 How to Read the Audit Timeline (Simulated Events vs System Health)", expanded=False):
+        st.markdown(
+            r"""
+            This timeline records **simulated distributed system discrete events** as your cluster processes requests and responds to chaos:
+            
+            - **🚨 CRITICAL (Disaster Event):** An intentional simulated failure occurred (e.g. `Server 2 crashed! Heartbeat lost`).
+            - **⚠️ WARNING (Detection & Reassignment):** The **Health Monitor** detected a dead node after the detection delay ($1.50\text{s}$), or the **Recovery Manager** rescued a task. *This is not an application bug — it confirms the automated failover engine is actively working!*
+            - **✔ SUCCESS (Task Saved / Node Restored):** A reassigned task completed successfully on a surviving node, or a server rebooted.
+            - **ℹ️ INFO (Cluster Telemetry):** Cluster initialization, workload provisioning, or auto-scaler scale-in actions.
+            """
+        )
 
     # Apply filters
     filtered_entries = list(entries)
@@ -45,7 +64,65 @@ def render_event_timeline(logger: EventLogger) -> None:
         filtered_entries = [e for e in filtered_entries if e.severity in (EventSeverity.INFO, EventSeverity.SUCCESS)]
 
     if search_kw:
-        filtered_entries = [e for e in filtered_entries if search_kw in e.description.lower() or search_kw in e.source.lower()]
+        # Flexible token matching (supports commas, multiple words, partial words)
+        tokens = [t.strip().lower() for t in search_kw.replace(",", " ").split() if t.strip()]
+        if tokens:
+            filtered_entries = [
+                e for e in filtered_entries
+                if all(
+                    tok in e.description.lower()
+                    or tok in e.source.lower()
+                    or tok in e.severity.value.lower()
+                    for tok in tokens
+                )
+            ]
+
+    # Empty State Handling
+    if not filtered_entries:
+        st.caption(f"Showing **0** of {len(entries)} events:")
+        if len(entries) <= 1:
+            st.info(
+                "⏸️ **Simulation Paused at Clock 0.00s:** Only the initialization event has been logged so far. "
+                "Scroll up to **Section 1 (Simulation Setup & Playback Controls)** and click "
+                "**'🚀 Run Full Simulation'** or **'⏯️ Step Forward (+5 Events)'** to generate live workload, crash, and recovery events."
+            )
+        else:
+            conflict_reasons = []
+            if sev_filter == "Success & Normal Only":
+                conflict_reasons.append("• **Severity Filter:** Set to *'Success & Normal Only'*, which hides all 🚨 Critical crashes and ⚠️ Warnings.")
+            elif sev_filter != "All Events":
+                conflict_reasons.append(f"• **Severity Filter:** Set to *'{sev_filter}'*.")
+            if search_kw:
+                conflict_reasons.append(f"• **Search Query:** *'{search_kw}'* matched 0 events in the current log.")
+
+            reasons_text = "<br>".join(conflict_reasons)
+            st.markdown(
+                f"""
+                <div style="
+                    background: rgba(30, 41, 59, 0.6);
+                    border: 1px dashed rgba(245, 158, 11, 0.45);
+                    border-radius: 10px;
+                    padding: 1rem 1.2rem;
+                    margin-bottom: 0.8rem;
+                ">
+                    <div style="color: #FCD34D; font-weight: 700; margin-bottom: 0.4rem;">
+                        🔍 No events match your current filter criteria:
+                    </div>
+                    <div style="color: #CBD5E1; font-size: 0.84rem; line-height: 1.5;">
+                        {reasons_text}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        btn_col, _ = st.columns([2, 3])
+        with btn_col:
+            if st.button("🔄 Reset Filters to All Events", key="btn_reset_timeline_filters", use_container_width=True):
+                st.session_state.timeline_sev_filter = "All Events"
+                st.session_state.timeline_search_kw = ""
+                st.rerun()
+        return
 
     st.caption(f"Showing **{len(filtered_entries)}** of {len(entries)} events (latest events at top):")
 
@@ -103,3 +180,4 @@ def render_event_timeline(logger: EventLogger) -> None:
     </div>
     """
     st.markdown(timeline_container, unsafe_allow_html=True)
+

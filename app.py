@@ -23,6 +23,8 @@ from src.load_balancer import (
     generate_server_names,
     round_robin_scheduler,
     least_loaded_scheduler,
+    validate_request_inputs,
+    assign_single_request,
 )
 from src.metrics import (
     calculate_algorithm_metrics,
@@ -32,6 +34,11 @@ from src.metrics import (
     build_server_workload_dataframe,
     export_simulation_reports,
 )
+import importlib
+import dashboard.cluster_monitor
+import dashboard.chaos_lab
+importlib.reload(dashboard.cluster_monitor)
+importlib.reload(dashboard.chaos_lab)
 from dashboard.chaos_lab import render_chaos_lab_page
 
 # -----------------------------------------------------------------------------
@@ -50,59 +57,211 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Global Typography & Background adjustments */
+    /* -------------------------------------------------------------------------
+       1. GLOBAL TYPOGRAPHY, CONTAINER & FLUID SPACING
+       ------------------------------------------------------------------------- */
     .block-container {
         padding-top: 1.8rem;
         padding-bottom: 2.5rem;
+        max-width: 1400px;
+    }
+    @media (max-width: 768px) {
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 2rem !important;
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
     }
     
-    /* Header Card */
+    /* -------------------------------------------------------------------------
+       2. RESPONSIVE HEADER BOX
+       ------------------------------------------------------------------------- */
     .header-box {
         background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 55%, #312E81 100%);
         color: #FFFFFF;
-        padding: 1.6rem 2rem;
-        border-radius: 12px;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);
+        padding: clamp(1.2rem, 3vw, 2rem);
+        border-radius: 14px;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
+        border: 1px solid rgba(99, 102, 241, 0.3);
     }
     .header-title {
-        font-size: 2.1rem;
-        font-weight: 700;
+        font-size: clamp(1.4rem, 4vw, 2.2rem);
+        font-weight: 800;
         margin: 0;
         letter-spacing: -0.5px;
         color: #FFFFFF;
+        line-height: 1.25;
     }
     .header-subtitle {
-        font-size: 0.98rem;
+        font-size: clamp(0.85rem, 2vw, 1.02rem);
         color: #93C5FD;
-        margin-top: 0.35rem;
+        margin-top: 0.45rem;
         font-weight: 400;
+        line-height: 1.5;
+    }
+    .header-badge-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        align-items: center;
+        margin-top: 0.85rem;
     }
     .header-badge {
         display: inline-block;
         background-color: rgba(99, 102, 241, 0.25);
         border: 1px solid rgba(165, 180, 252, 0.4);
         color: #E0E7FF;
-        font-size: 0.78rem;
+        font-size: 0.76rem;
         font-weight: 600;
-        padding: 0.2rem 0.65rem;
+        padding: 0.22rem 0.65rem;
         border-radius: 20px;
-        margin-top: 0.7rem;
     }
     .transition-live-badge {
         display: inline-block;
         background: linear-gradient(135deg, #10B981, #059669);
         color: #FFFFFF;
-        font-size: 0.76rem;
+        font-size: 0.74rem;
         font-weight: 700;
-        padding: 0.2rem 0.65rem;
+        padding: 0.22rem 0.65rem;
         border-radius: 20px;
-        margin-left: 0.5rem;
         box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
         animation: pulseLive 2s infinite ease-in-out;
     }
 
-    /* Section Cards */
+    /* -------------------------------------------------------------------------
+       3. INTERACTIVE QUICK JUMP NAVIGATION BAR
+       ------------------------------------------------------------------------- */
+    .quick-nav-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        overflow-x: auto;
+        padding: 0.55rem 0.75rem;
+        margin-bottom: 1.4rem;
+        background: rgba(15, 23, 42, 0.68);
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-radius: 12px;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+    .quick-nav-label {
+        font-size: 0.76rem;
+        font-weight: 700;
+        color: #94A3B8;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+        margin-right: 0.25rem;
+    }
+    .quick-nav-pill {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(30, 41, 59, 0.75);
+        color: #93C5FD !important;
+        border: 1px solid rgba(59, 130, 246, 0.25);
+        padding: 0.25rem 0.7rem;
+        border-radius: 20px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-decoration: none !important;
+        white-space: nowrap;
+        transition: all 0.22s ease;
+    }
+    .quick-nav-pill:hover {
+        background: #1E3A8A;
+        color: #FFFFFF !important;
+        border-color: #38BDF8;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+    }
+
+    /* -------------------------------------------------------------------------
+       4. SECTION HEADERS & ANCHOR STYLES
+       ------------------------------------------------------------------------- */
+    .section-header-box {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1.5rem;
+        margin-bottom: 0.4rem;
+        padding-bottom: 0.35rem;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+    }
+    .section-header-title {
+        font-size: clamp(1.15rem, 2.5vw, 1.45rem);
+        font-weight: 700;
+        margin: 0;
+        color: #F8FAFC;
+    }
+    .section-header-desc {
+        font-size: 0.86rem;
+        color: #94A3B8;
+        margin-top: -0.1rem;
+        margin-bottom: 0.85rem;
+        line-height: 1.45;
+    }
+
+    /* -------------------------------------------------------------------------
+       5. RESPONSIVE COLUMNS & GRID WRAPPING
+       ------------------------------------------------------------------------- */
+    @media (max-width: 900px) {
+        div[data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 0.65rem !important;
+        }
+        div[data-testid="column"] {
+            min-width: calc(50% - 0.65rem) !important;
+            flex: 1 1 calc(50% - 0.65rem) !important;
+        }
+    }
+    @media (max-width: 580px) {
+        div[data-testid="column"] {
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+       6. METRIC KPI CARDS RESPONSIVENESS
+       ------------------------------------------------------------------------- */
+    div[data-testid="stMetric"] {
+        background: rgba(148, 163, 184, 0.08);
+        padding: clamp(0.7rem, 1.8vw, 1rem) clamp(0.85rem, 2vw, 1.2rem);
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        backdrop-filter: blur(6px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        animation: outcomeEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+        min-width: 0;
+        word-break: break-word;
+        overflow-wrap: break-word;
+    }
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
+        border-color: #60A5FA;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: clamp(1.05rem, 2.2vw, 1.65rem) !important;
+        font-weight: 700 !important;
+        line-height: 1.25 !important;
+    }
+    div[data-testid="stMetricLabel"] {
+        font-size: clamp(0.72rem, 1.6vw, 0.86rem) !important;
+        font-weight: 600 !important;
+        color: #94A3B8 !important;
+    }
+
+    /* -------------------------------------------------------------------------
+       7. SECTION CARDS & EDUCATIONAL CALLOUTS
+       ------------------------------------------------------------------------- */
     .section-card {
         background-color: rgba(148, 163, 184, 0.06);
         border: 1px solid rgba(148, 163, 184, 0.2);
@@ -112,7 +271,36 @@ st.markdown(
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
         animation: outcomeEntrance 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
-    
+    .callout-box {
+        background: rgba(37, 99, 235, 0.12);
+        border-left: 4px solid #3B82F6;
+        padding: 1rem 1.25rem;
+        border-radius: 0 8px 8px 0;
+        font-size: clamp(0.85rem, 1.8vw, 0.95rem);
+        line-height: 1.55;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08);
+        animation: outcomeEntrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .callout-box:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.15);
+    }
+    .edu-tip-box {
+        background: rgba(15, 23, 42, 0.72);
+        border: 1px solid rgba(59, 130, 246, 0.28);
+        border-left: 4px solid #38BDF8;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        font-size: 0.86rem;
+        line-height: 1.5;
+        margin-top: 0.6rem;
+        margin-bottom: 0.8rem;
+        color: #E2E8F0;
+    }
+
     /* Verification Pills */
     .pill-success {
         background-color: rgba(16, 185, 129, 0.15);
@@ -120,7 +308,7 @@ st.markdown(
         border: 1px solid rgba(16, 185, 129, 0.35);
         padding: 0.35rem 0.75rem;
         border-radius: 6px;
-        font-size: 0.85rem;
+        font-size: clamp(0.75rem, 1.6vw, 0.85rem);
         font-weight: 600;
         display: inline-flex;
         align-items: center;
@@ -134,27 +322,8 @@ st.markdown(
         background-color: rgba(16, 185, 129, 0.25);
     }
 
-    /* Recommendation Callout */
-    .callout-box {
-        background: rgba(37, 99, 235, 0.12);
-        border-left: 4px solid #3B82F6;
-        padding: 1rem 1.25rem;
-        border-radius: 0 8px 8px 0;
-        font-size: 0.95rem;
-        line-height: 1.5;
-        margin-top: 1rem;
-        margin-bottom: 1rem;
-        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08);
-        animation: outcomeEntrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
-        transition: transform 0.25s ease, box-shadow 0.25s ease;
-    }
-    .callout-box:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.15);
-    }
-
     /* -------------------------------------------------------------------------
-       CIRCULAR SPINNER & ANIMATED CURSOR SIMULATION CARD
+       8. CIRCULAR SPINNER & ANIMATED CURSOR SIMULATION CARD
        ------------------------------------------------------------------------- */
     .simulation-loading-card {
         background: linear-gradient(135deg, rgba(30, 41, 59, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%);
@@ -170,14 +339,12 @@ st.markdown(
         justify-content: center;
         animation: pulseCard 1.8s ease-in-out infinite alternate;
     }
-
     .circular-cursor-spinner {
         width: 72px;
         height: 72px;
         position: relative;
         margin-bottom: 1.2rem;
     }
-
     .circular-cursor-spinner::before {
         content: "";
         box-sizing: border-box;
@@ -189,7 +356,6 @@ st.markdown(
         border-radius: 50%;
         border: 5px solid rgba(226, 232, 240, 0.25);
     }
-
     .circular-cursor-spinner::after {
         content: "";
         box-sizing: border-box;
@@ -206,20 +372,17 @@ st.markdown(
         animation: circularSpin 0.85s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
         box-shadow: 0 0 18px rgba(59, 130, 246, 0.45);
     }
-
     .simulation-step-title {
         font-size: 1.25rem;
         font-weight: 700;
         color: #F8FAFC;
         margin-bottom: 0.35rem;
     }
-
     .simulation-step-desc {
         font-size: 0.95rem;
         color: #93C5FD;
         margin-bottom: 1rem;
     }
-
     .simulation-progress-bar {
         width: 100%;
         max-width: 440px;
@@ -229,7 +392,6 @@ st.markdown(
         overflow: hidden;
         position: relative;
     }
-
     .simulation-progress-fill {
         height: 100%;
         background: linear-gradient(90deg, #38BDF8, #818CF8, #3B82F6);
@@ -238,7 +400,7 @@ st.markdown(
     }
 
     /* -------------------------------------------------------------------------
-       OUTCOME TRANSITIONS FOR GRAPHS, TABLES, IMAGES & METRIC CARDS
+       9. OUTCOME TRANSITIONS FOR GRAPHS, TABLES & METRIC CARDS
        ------------------------------------------------------------------------- */
     @keyframes outcomeEntrance {
         0% {
@@ -254,17 +416,14 @@ st.markdown(
             transform: translateY(0) scale(1.0);
         }
     }
-
     @keyframes circularSpin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
-
     @keyframes pulseCard {
         0% { box-shadow: 0 6px 18px rgba(37, 99, 235, 0.15); }
         100% { box-shadow: 0 14px 32px rgba(124, 58, 237, 0.28); }
     }
-
     @keyframes pulseLive {
         0%, 100% { opacity: 1; transform: scale(1); }
         50% { opacity: 0.85; transform: scale(1.04); }
@@ -280,16 +439,16 @@ st.markdown(
         animation: outcomeEntrance 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
         transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease, border-color 0.35s ease;
     }
-
     div[data-testid="stImage"]:hover {
         transform: translateY(-4px) scale(1.008);
         box-shadow: 0 12px 26px rgba(59, 130, 246, 0.2);
         border-color: #60A5FA;
     }
-
     div[data-testid="stImage"] img {
         border-radius: 8px;
         transition: opacity 0.3s ease;
+        max-width: 100%;
+        height: auto;
     }
 
     /* Table Transitions (DataFrames) */
@@ -299,28 +458,11 @@ st.markdown(
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
         animation: outcomeEntrance 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
         transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        width: 100% !important;
+        overflow-x: auto;
     }
-
     div[data-testid="stDataFrame"]:hover {
         box-shadow: 0 8px 20px rgba(59, 130, 246, 0.12);
-        border-color: #60A5FA;
-    }
-
-    /* Metric KPI Cards Transitions */
-    div[data-testid="stMetric"] {
-        background: rgba(148, 163, 184, 0.08);
-        padding: 0.95rem 1.15rem;
-        border-radius: 10px;
-        border: 1px solid rgba(148, 163, 184, 0.25);
-        backdrop-filter: blur(6px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        animation: outcomeEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
-    }
-
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
         border-color: #60A5FA;
     }
 
@@ -335,7 +477,7 @@ st.markdown(
     }
 
     /* -------------------------------------------------------------------------
-       GLASSY RIGHT-SIDE WEBSITE SCROLLER & SCROLLBAR
+       10. GLASSY SCROLLER & SCROLLBAR
        ------------------------------------------------------------------------- */
     ::-webkit-scrollbar {
         width: 10px;
@@ -361,20 +503,18 @@ st.markdown(
         box-shadow: 0 0 18px rgba(56, 189, 248, 0.75);
     }
 
-    /* -------------------------------------------------------------------------
-       BOTTOM-TO-TOP RIGHT-SIDE GLASSY FLOATING SCROLLER BUTTON
-       ------------------------------------------------------------------------- */
+    /* Floating scroller button */
     .glassy-scroller-btn {
         position: fixed;
-        bottom: 28px;
-        right: 28px;
+        bottom: 24px;
+        right: 24px;
         z-index: 999999;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        width: 52px;
-        height: 52px;
+        width: 48px;
+        height: 48px;
         border-radius: 50%;
         background: rgba(15, 23, 42, 0.72);
         backdrop-filter: blur(16px);
@@ -384,32 +524,42 @@ st.markdown(
         box-shadow: 0 8px 32px 0 rgba(15, 23, 42, 0.55), inset 0 0 14px rgba(56, 189, 248, 0.18);
         cursor: pointer;
         text-decoration: none !important;
-        transition: all 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+        transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         user-select: none;
         animation: scrollerFloat 3s ease-in-out infinite alternate;
     }
     .glassy-scroller-btn:hover {
-        transform: translateY(-6px) scale(1.12);
+        transform: translateY(-5px) scale(1.1);
         background: rgba(30, 41, 59, 0.88);
         border-color: #38BDF8;
         color: #FFFFFF !important;
         box-shadow: 0 14px 40px rgba(56, 189, 248, 0.5), 0 0 24px rgba(56, 189, 248, 0.65), inset 0 0 16px rgba(56, 189, 248, 0.35);
     }
     .glassy-scroller-btn .arrow-icon {
-        font-size: 1.18rem;
+        font-size: 1.05rem;
         font-weight: 900;
         line-height: 1;
-        transition: transform 0.3s ease;
-    }
-    .glassy-scroller-btn:hover .arrow-icon {
-        transform: translateY(-2px);
     }
     .glassy-scroller-btn .btn-label {
-        font-size: 0.55rem;
+        font-size: 0.52rem;
         font-weight: 800;
         letter-spacing: 0.8px;
         color: #93C5FD;
         margin-top: 2px;
+    }
+    @media (max-width: 600px) {
+        .glassy-scroller-btn {
+            bottom: 14px;
+            right: 14px;
+            width: 40px;
+            height: 40px;
+        }
+        .glassy-scroller-btn .arrow-icon {
+            font-size: 0.9rem;
+        }
+        .glassy-scroller-btn .btn-label {
+            font-size: 0.45rem;
+        }
     }
 
     @keyframes scrollerFloat {
@@ -499,11 +649,11 @@ def main():
     app_mode = st.sidebar.radio(
         "Select Active Module:",
         options=[
-            "⚡ Cloud Chaos Lab (Intelligent Recovery)",
-            "📊 Classic Workload Benchmark"
+            "📊 Classic Workload Benchmark",
+            "⚡ Cloud Chaos Lab (Intelligent Recovery)"
         ],
         index=0,
-        help="Switch between the interactive Cloud Chaos Lab and the baseline academic benchmark."
+        help="Switch between the baseline academic benchmark and the interactive Cloud Chaos Lab."
     )
     st.sidebar.markdown("---")
 
@@ -521,7 +671,22 @@ def main():
             <div class="header-subtitle">
                 Cloud & Distributed Computing — Performance Evaluation of Workload-Aware vs. Cyclic Scheduling
             </div>
-            <span class="header-badge">Distributed Systems Simulator • Pure Python & Pandas</span>
+            <div class="header-badge-container">
+                <span class="header-badge">Distributed Systems Simulator</span>
+                <span class="header-badge">Pure Python & Pandas</span>
+                <span class="transition-live-badge">⚡ Real-Time Engine Active</span>
+            </div>
+        </div>
+
+        <div class="quick-nav-bar">
+            <span class="quick-nav-label">⚡ Jump To:</span>
+            <a href="#section-1" class="quick-nav-pill">📊 1. Dataset Profile</a>
+            <a href="#section-2" class="quick-nav-pill">🖥️ 2. Workload Monitor</a>
+            <a href="#section-3" class="quick-nav-pill">➕ 3. Add Request</a>
+            <a href="#section-4" class="quick-nav-pill">⚖️ 4. Comparative Benchmark</a>
+            <a href="#section-5" class="quick-nav-pill">🔎 5. Assignment Browser</a>
+            <a href="#section-6" class="quick-nav-pill">🛡️ 6. Correctness Guarantees</a>
+            <a href="#section-7" class="quick-nav-pill">📥 7. Export Center</a>
         </div>
         """,
         unsafe_allow_html=True,
@@ -577,9 +742,21 @@ def main():
     )
 
     # -------------------------------------------------------------------------
-    # 3. DATASET OVERVIEW SECTION
+    # 1. DATASET OVERVIEW SECTION
     # -------------------------------------------------------------------------
-    st.markdown("### 📊 1. Workload Dataset Profile")
+    st.markdown(
+        """
+        <div id="section-1"></div>
+        <div class="section-header-box">
+            <h3 class="section-header-title">📊 1. Workload Dataset Profile</h3>
+            <span class="header-badge">Baseline Trace • 1,000 Tasks</span>
+        </div>
+        <div class="section-header-desc">
+            Structural characteristics, duration metrics, and task category distributions of the benchmark workload trace.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
@@ -615,38 +792,9 @@ def main():
             
             ax_types.set_xlim(0, max(types_series.values) * 1.15)
             plt.tight_layout()
-            st.pyplot(fig_types)
+            st.pyplot(fig_types, use_container_width=True)
 
     st.markdown("---")
-
-    # -------------------------------------------------------------------------
-    # 4. RUN SIMULATION & COMPUTE METRICS
-    # -------------------------------------------------------------------------
-    rr_assignments, rr_loads = round_robin_scheduler(df, servers)
-    ll_assignments, ll_loads = least_loaded_scheduler(df, servers)
-
-    rr_metrics = calculate_algorithm_metrics("Round Robin", rr_assignments, rr_loads)
-    ll_metrics = calculate_algorithm_metrics("Least Loaded", ll_assignments, ll_loads)
-
-    reduction_pct = calculate_load_imbalance_reduction(
-        rr_metrics["Load_Imbalance_ms"], ll_metrics["Load_Imbalance_ms"]
-    )
-
-    comp_df = build_performance_comparison_dataframe(rr_metrics, ll_metrics)
-    sw_df = build_server_workload_dataframe(rr_metrics, ll_metrics)
-
-    # Export to outputs/ if triggered
-    if export_clicked:
-        outputs_dir = Path(__file__).resolve().parent / "outputs"
-        paths = export_simulation_reports(outputs_dir, rr_assignments, ll_assignments, comp_df, sw_df)
-        st.toast(f"✅ All 4 reports exported to outputs/ ({num_servers} servers)", icon="💾")
-        st.success(
-            f"**Reports successfully saved to:** `{outputs_dir.resolve()}`\n"
-            f"- `round_robin_assignments.csv`\n"
-            f"- `least_loaded_assignments.csv`\n"
-            f"- `performance_comparison.csv`\n"
-            f"- `server_workload_comparison.csv`"
-        )
 
     # -------------------------------------------------------------------------
     # CIRCULAR CURSOR & SPINNER SIMULATION ANIMATION PIPELINE
@@ -683,19 +831,88 @@ def main():
         st.toast("✅ Simulation complete! Outcome graphs, tables & metrics transitioned.", icon="🚀")
 
     # -------------------------------------------------------------------------
-    # 5. SERVER WORKLOAD MONITORING
+    # SIMULATION STATE INITIALIZATION & SESSION PERSISTENCE
+    # -------------------------------------------------------------------------
+    needs_state_init = (
+        "simulation_state" not in st.session_state
+        or st.session_state.get("sim_num_servers") != num_servers
+        or run_clicked
+    )
+
+    if needs_state_init:
+        init_rr_assign, init_rr_loads = round_robin_scheduler(df, servers)
+        init_ll_assign, init_ll_loads = least_loaded_scheduler(df, servers)
+        st.session_state.simulation_state = {
+            "rr_assignments": init_rr_assign.copy(),
+            "rr_loads": dict(init_rr_loads),
+            "ll_assignments": init_ll_assign.copy(),
+            "ll_loads": dict(init_ll_loads),
+            "rr_index": len(df),
+            "next_req_num": 1001,
+            "added_requests": [],
+            "last_message": None,
+        }
+        st.session_state.sim_num_servers = num_servers
+
+    sim_state = st.session_state.simulation_state
+    rr_assignments = sim_state["rr_assignments"]
+    rr_loads = sim_state["rr_loads"]
+    ll_assignments = sim_state["ll_assignments"]
+    ll_loads = sim_state["ll_loads"]
+
+    rr_metrics = calculate_algorithm_metrics("Round Robin", rr_assignments, rr_loads)
+    ll_metrics = calculate_algorithm_metrics("Least Loaded", ll_assignments, ll_loads)
+
+    reduction_pct = calculate_load_imbalance_reduction(
+        rr_metrics["Load_Imbalance_ms"], ll_metrics["Load_Imbalance_ms"]
+    )
+
+    comp_df = build_performance_comparison_dataframe(rr_metrics, ll_metrics)
+    sw_df = build_server_workload_dataframe(rr_metrics, ll_metrics)
+
+    # Export to outputs/ if triggered
+    if export_clicked:
+        outputs_dir = Path(__file__).resolve().parent / "outputs"
+        paths = export_simulation_reports(outputs_dir, rr_assignments, ll_assignments, comp_df, sw_df)
+        st.toast(f"✅ All 4 reports exported to outputs/ ({num_servers} servers)", icon="💾")
+        st.success(
+            f"**Reports successfully saved to:** `{outputs_dir.resolve()}`\n"
+            f"- `round_robin_assignments.csv`\n"
+            f"- `least_loaded_assignments.csv`\n"
+            f"- `performance_comparison.csv`\n"
+            f"- `server_workload_comparison.csv`"
+        )
+
+    # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # 2. SERVER CLUSTER WORKLOAD MONITORING
     # -------------------------------------------------------------------------
     st.markdown(
         """
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; margin-top: 1.2rem;">
-            <h3 style="margin: 0;">🖥️ 2. Server Cluster Workload Monitoring</h3>
-            <span class="transition-live-badge">⚡ Transitions Active</span>
+        <div id="section-2"></div>
+        <div class="section-header-box">
+            <h3 class="section-header-title">🖥️ 2. Server Cluster Workload Monitoring</h3>
+            <span class="transition-live-badge">⚡ Live Telemetry Active</span>
+        </div>
+        <div class="section-header-desc">
+            Real-time cumulative processing workload (ms) and task counts allocated across virtual cloud servers.
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+    with st.expander("💡 Quick Guide: How to Read Server Workloads & Deltas", expanded=False):
+        st.markdown(
+            r"""
+            - **Cumulative Workload (ms):** Total CPU burst duration assigned to this server node.
+            - **Task Count:** Number of requests dispatched to this server. Round Robin strictly equalizes counts ($i \pmod N$), while Least Loaded dynamically routes based on cumulative burst time.
+            - **Workload Delta ($+$ / $-$ ms):** Deviation from the ideal cluster average ($Total \div N$). A positive delta ($+$) indicates an overloaded node; a negative delta ($-$) indicates spare compute headroom.
+            - **Progress Bar:** Workload proportion relative to the highest-loaded server in the cluster.
+            """
+        )
     
-    mean_target_workload = stats["total_workload_ms"] / num_servers
+    total_active_workload = sum(ll_loads.values())
+    mean_target_workload = total_active_workload / num_servers
 
     if algo_choice in ("Compare Both (Recommended)", "Round Robin"):
         st.markdown("#### Round Robin — Server Allocation")
@@ -738,17 +955,244 @@ def main():
     st.markdown("---")
 
     # -------------------------------------------------------------------------
-    # 6. ALGORITHM COMPARISON & VISUALIZATIONS
+    # 3. ADD NEW REQUEST (DYNAMIC LOAD BALANCING)
     # -------------------------------------------------------------------------
     st.markdown(
         """
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-            <h3 style="margin: 0;">⚖️ 3. Comparative Performance Analysis</h3>
-            <span class="transition-live-badge">📊 Graph & Table Transitions Active</span>
+        <div id="section-3"></div>
+        <div class="section-header-box">
+            <h3 class="section-header-title">➕ 3. Add New Request (Dynamic Dispatcher)</h3>
+            <span class="transition-live-badge">✨ Dynamic Injection Active</span>
+        </div>
+        <div class="section-header-desc">
+            Inject custom tasks after the initial 1,000-request simulation to evaluate live server backlog allocation in real time.
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+    # Show success notification if a request was just added
+    if sim_state.get("last_message"):
+        st.success(f"✅ **{sim_state['last_message']}**")
+
+    with st.expander("📝 Manually Create New Request", expanded=True):
+        st.markdown(
+            "Dynamically inject a new cloud request after the baseline 1,000-request simulation. "
+            "The selected load balancing strategy will evaluate current server workloads and route the request immediately."
+        )
+
+        with st.expander("ℹ️ Reference: Cloud Request Types & Typical Execution Characteristics", expanded=False):
+            st.markdown(
+                """
+                | Request Type | Typical Duration | Network Payload | Real-World Cloud Analogy |
+                | :--- | :---: | :---: | :--- |
+                | **API Read** | 30 – 200 ms | 0.5 – 5 MB | Lightweight REST/GraphQL queries, cache reads |
+                | **Database Query** | 50 – 400 ms | 1 – 15 MB | Complex SQL joins, filtered record indexing |
+                | **File Upload** | 100 – 600 ms | 10 – 50 MB | Multi-part S3 object uploads, media ingestion |
+                | **Report Generation** | 300 – 800 ms | 20 – 100 MB | Aggregated analytical reports, PDF compilation |
+                """
+            )
+
+        form_c1, form_c2, form_c3 = st.columns(3)
+
+        with form_c1:
+            auto_generate_id = st.checkbox(
+                "Auto-generate Request ID",
+                value=True,
+                help="Automatically generates the next sequential ID: Request 1001, 1002, 1003, etc."
+            )
+            next_id_val = f"Request {sim_state['next_req_num']}"
+            if auto_generate_id:
+                manual_req_id = st.text_input(
+                    "Request ID:",
+                    value=next_id_val,
+                    disabled=True,
+                    help="Auto-generated sequential Request ID."
+                )
+            else:
+                manual_req_id = st.text_input(
+                    "Request ID:",
+                    value=next_id_val,
+                    placeholder="e.g. Request 1001 or REQ1001",
+                    help="Custom unique Request ID."
+                )
+
+        with form_c2:
+            request_type_choice = st.selectbox(
+                "Request Type:",
+                options=["API Read", "File Upload", "Report Generation", "Database Query"],
+                index=0,
+                help="Category of cloud workload request."
+            )
+
+        with form_c3:
+            strategy_options = ["Least Loaded", "Round Robin"]
+            default_strat_idx = 0 if algo_choice in ("Compare Both (Recommended)", "Least Loaded") else 1
+            request_strategy = st.selectbox(
+                "Load Balancing Strategy:",
+                options=strategy_options,
+                index=default_strat_idx,
+                help="Scheduling strategy to assign this incoming request."
+            )
+
+        param_c1, param_c2, param_c3 = st.columns(3)
+
+        with param_c1:
+            processing_time_val = st.number_input(
+                "Processing Time (ms):",
+                min_value=1,
+                max_value=100000,
+                value=250,
+                step=25,
+                help="CPU execution time in milliseconds required on the server."
+            )
+
+        with param_c2:
+            data_size_val = st.number_input(
+                "Data Size (MB):",
+                min_value=0.0,
+                max_value=10000.0,
+                value=5.00,
+                step=0.5,
+                format="%.2f",
+                help="Payload data size in megabytes."
+            )
+
+        with param_c3:
+            # Telemetry Preview Box
+            current_min_srv = min(servers, key=lambda s: ll_loads[s])
+            rr_next_srv = servers[sim_state["rr_index"] % len(servers)]
+            st.markdown(
+                f"""
+                <div style="background: rgba(148, 163, 184, 0.08); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 8px; padding: 0.65rem 0.9rem; font-size: 0.85rem; margin-top: 0.35rem;">
+                    <div style="color: #93C5FD; font-weight: 600; margin-bottom: 2px;">⚡ Live Server Backlog Status</div>
+                    <div>Least Loaded Candidate: <strong style="color: #10B981;">{current_min_srv}</strong> ({ll_loads[current_min_srv]:,} ms)</div>
+                    <div>Round Robin Next Node: <strong style="color: #3B82F6;">{rr_next_srv}</strong></div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        btn_c1, btn_c2, _ = st.columns([2, 2, 4])
+        with btn_c1:
+            add_request_clicked = st.button("🚀 Add Request", type="primary", use_container_width=True)
+        with btn_c2:
+            if len(sim_state["added_requests"]) > 0:
+                reset_dynamic_clicked = st.button("🔄 Reset to Initial 1,000 Requests", use_container_width=True)
+            else:
+                reset_dynamic_clicked = False
+
+        if reset_dynamic_clicked:
+            init_rr_assign, init_rr_loads = round_robin_scheduler(df, servers)
+            init_ll_assign, init_ll_loads = least_loaded_scheduler(df, servers)
+            sim_state["rr_assignments"] = init_rr_assign.copy()
+            sim_state["rr_loads"] = dict(init_rr_loads)
+            sim_state["ll_assignments"] = init_ll_assign.copy()
+            sim_state["ll_loads"] = dict(init_ll_loads)
+            sim_state["rr_index"] = len(df)
+            sim_state["next_req_num"] = 1001
+            sim_state["added_requests"] = []
+            sim_state["last_message"] = None
+            st.toast("Cluster reset to baseline 1,000 requests.", icon="🔄")
+            st.rerun()
+
+        if add_request_clicked:
+            # Check for ID collisions across initial dataset and assignments
+            all_existing_ids = set(df["Request_ID"]).union(
+                set(sim_state["rr_assignments"]["Request_ID"])
+            ).union(
+                set(sim_state["ll_assignments"]["Request_ID"])
+            )
+
+            is_valid, err_msg, cleaned_req = validate_request_inputs(
+                request_id=manual_req_id,
+                request_type=request_type_choice,
+                processing_time_ms=processing_time_val,
+                data_size_mb=data_size_val,
+                existing_ids=all_existing_ids
+            )
+
+            if not is_valid:
+                st.error(f"❌ Input Validation Error: {err_msg}")
+            else:
+                id_raw = str(cleaned_req["Request_ID"]).strip()
+                id_display = id_raw if id_raw.lower().startswith("request") else f"Request {id_raw}"
+
+                if request_strategy == "Least Loaded":
+                    selected_srv, rec, updated_loads = assign_single_request(
+                        request=cleaned_req,
+                        servers=servers,
+                        current_loads=sim_state["ll_loads"],
+                        strategy="Least Loaded"
+                    )
+                    sim_state["ll_loads"] = updated_loads
+                    sim_state["ll_assignments"] = pd.concat(
+                        [sim_state["ll_assignments"], pd.DataFrame([rec])],
+                        ignore_index=True
+                    )
+                    success_msg = f"{id_display} assigned to {selected_srv} using Least Loaded strategy."
+                else:  # Round Robin
+                    selected_srv, rec, updated_loads = assign_single_request(
+                        request=cleaned_req,
+                        servers=servers,
+                        current_loads=sim_state["rr_loads"],
+                        strategy="Round Robin",
+                        current_index=sim_state["rr_index"]
+                    )
+                    sim_state["rr_loads"] = updated_loads
+                    sim_state["rr_assignments"] = pd.concat(
+                        [sim_state["rr_assignments"], pd.DataFrame([rec])],
+                        ignore_index=True
+                    )
+                    sim_state["rr_index"] += 1
+                    success_msg = f"{id_display} assigned to {selected_srv} using Round Robin strategy."
+
+                sim_state["added_requests"].append({
+                    "Request_ID": cleaned_req["Request_ID"],
+                    "Request_Type": cleaned_req["Request_Type"],
+                    "Processing_Time_ms": cleaned_req["Processing_Time_ms"],
+                    "Data_Size_MB": cleaned_req["Data_Size_MB"],
+                    "Strategy": request_strategy,
+                    "Assigned_Server": selected_srv,
+                })
+                sim_state["next_req_num"] += 1
+                sim_state["last_message"] = success_msg
+                st.toast(success_msg, icon="☁️")
+                st.rerun()
+
+        # Display history of manually added requests if any exist
+        if len(sim_state["added_requests"]) > 0:
+            st.markdown(f"**Manually Injected Requests Log ({len(sim_state['added_requests'])}):**")
+            render_dataframe(pd.DataFrame(sim_state["added_requests"]), height=160)
+
+    st.markdown("---")
+
+    # -------------------------------------------------------------------------
+    # 4. ALGORITHM COMPARISON & VISUALIZATIONS
+    # -------------------------------------------------------------------------
+    st.markdown(
+        """
+        <div id="section-4"></div>
+        <div class="section-header-box">
+            <h3 class="section-header-title">⚖️ 4. Comparative Performance Analysis</h3>
+            <span class="transition-live-badge">📊 Analytics Active</span>
+        </div>
+        <div class="section-header-desc">
+            Side-by-side evaluation of load distribution uniformity, inter-server imbalance, and estimated makespan.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("ℹ️ Metrics Guide: Key Performance Indicators Explained", expanded=False):
+        st.markdown(
+            """
+            - **Inter-Server Load Imbalance:** The gap between the heaviest loaded server and the least loaded server ($Max - Min$). **Lower is better.** A lower imbalance means compute resources are utilized uniformly without starvation.
+            - **Estimated Makespan:** The workload of the busiest server ($Max$). Under concurrent batch execution, makespan represents the total elapsed time to finish all tasks. **Lower is better.**
+            - **Load Imbalance Reduction (%):** How much Least Loaded compressed the load disparity compared to Round Robin:
+              $$\\text{Reduction (\\%)} = \\frac{\\text{Imbalance}_{RR} - \\text{Imbalance}_{LL}}{\\text{Imbalance}_{RR}} \\times 100$$
+            """
+        )
 
     # Display Comparison KPI Cards
     kpi_c1, kpi_c2, kpi_c3, kpi_c4 = st.columns(4)
@@ -826,7 +1270,7 @@ def main():
             ax_servers.set_title("Total Workload per Server", fontsize=10, fontweight="bold")
             ax_servers.legend(fontsize=8)
             plt.tight_layout()
-            st.pyplot(fig_servers)
+            st.pyplot(fig_servers, use_container_width=True)
 
         with chart_col2:
             st.markdown("**Inter-Server Load Imbalance & Makespan (ms)**")
@@ -844,7 +1288,7 @@ def main():
             
             ax_imb.set_ylim(0, max(imbs) * 1.18)
             plt.tight_layout()
-            st.pyplot(fig_imb)
+            st.pyplot(fig_imb, use_container_width=True)
 
     with tab_table:
         st.markdown("**Performance Comparison Summary:**")
@@ -855,9 +1299,21 @@ def main():
     st.markdown("---")
 
     # ---------------------------------------------------------
-    # 7. REQUEST ASSIGNMENTS INSPECTOR
+    # 5. REQUEST ASSIGNMENTS INSPECTOR
     # ---------------------------------------------------------
-    st.markdown("### 🔎 4. Request Assignment Browser")
+    st.markdown(
+        """
+        <div id="section-5"></div>
+        <div class="section-header-box">
+            <h3 class="section-header-title">🔎 5. Request Assignment Browser</h3>
+            <span class="header-badge">Granular Audit Log</span>
+        </div>
+        <div class="section-header-desc">
+            Filter, search, and verify individual task dispatch records, arrival timestamps, and cumulative backlogs.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     
     inspect_algo = st.radio(
         "Select assignments table to browse:",
@@ -865,19 +1321,20 @@ def main():
         horizontal=True,
     )
     active_assignments = ll_assignments if inspect_algo == "Least Loaded" else rr_assignments
+    active_loads = ll_loads if inspect_algo == "Least Loaded" else rr_loads
 
     # Interactive Filters
     filter_col1, filter_col2, filter_col3 = st.columns([2, 2, 2])
     with filter_col1:
-        search_req_id = st.text_input("Search by Request ID:", value="", placeholder="e.g. REQ0015").strip().upper()
+        search_req_id = st.text_input("Search by Request ID:", value="", placeholder="e.g. REQ0015 or Request 1001").strip().upper()
     with filter_col2:
         filter_srv = st.selectbox("Filter by Server:", options=["All"] + servers)
     with filter_col3:
-        filter_type = st.selectbox("Filter by Request Type:", options=["All"] + sorted(list(stats["request_types_distribution"].keys())))
+        filter_type = st.selectbox("Filter by Request Type:", options=["All"] + sorted(list(set(active_assignments["Request_Type"].unique()))))
 
     filtered_df = active_assignments.copy()
     if search_req_id:
-        filtered_df = filtered_df[filtered_df["Request_ID"].str.contains(search_req_id, na=False)]
+        filtered_df = filtered_df[filtered_df["Request_ID"].astype(str).str.upper().str.contains(search_req_id, na=False)]
     if filter_srv != "All":
         filtered_df = filtered_df[filtered_df["Server"] == filter_srv]
     if filter_type != "All":
@@ -892,20 +1349,50 @@ def main():
     st.markdown("---")
 
     # ---------------------------------------------------------
-    # 8. CORRECTNESS VERIFICATION PILLS
+    # 6. CORRECTNESS VERIFICATION PILLS
     # ---------------------------------------------------------
-    st.markdown("### 🛡️ 5. Formal Simulation Correctness Guarantees")
-    
-    rr_check = verify_simulation_correctness(df, rr_assignments, rr_loads)
-    ll_check = verify_simulation_correctness(df, ll_assignments, ll_loads)
+    st.markdown(
+        """
+        <div id="section-6"></div>
+        <div class="section-header-box">
+            <h3 class="section-header-title">🛡️ 6. Formal Simulation Correctness Guarantees</h3>
+            <span class="header-badge">100% Invariant Verification</span>
+        </div>
+        <div class="section-header-desc">
+            Rigorous mathematical checks verifying total workload conservation, zero lost tasks, and non-duplication.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    if rr_check["all_passed"] and ll_check["all_passed"]:
+    with st.expander("💡 Mathematical Invariants Proven by This Simulation", expanded=False):
         st.markdown(
+            r"""
+            1. **Single Assignment Invariant:** Every input request is assigned to exactly one server ($|A| = |D|$).
+            2. **No Duplication / No Loss Invariant:** Set of assigned IDs strictly matches dataset IDs ($\{A_{id}\} = \{D_{id}\}$).
+            3. **Workload Conservation Law:** Total assigned CPU time matches the total input burst time ($\sum L_s = \sum P_i$).
+            4. **Load Accounting Accuracy:** Recorded server cumulative backlogs match the grouped sum of assigned request durations.
             """
+        )
+    
+    # Active requests to verify (original 1,000 requests + any manually added requests)
+    if len(active_assignments) == len(df):
+        active_input_df = df
+    else:
+        active_input_df = active_assignments[[
+            "Request_ID", "Arrival_Time", "Request_Type", "Processing_Time_ms", "Data_Size_MB"
+        ]]
+
+    active_check = verify_simulation_correctness(active_input_df, active_assignments, active_loads)
+
+    if active_check["all_passed"]:
+        total_active_ms = sum(active_loads.values())
+        st.markdown(
+            f"""
             <div>
-                <span class="pill-success">✔ All 1,000 requests assigned exactly once</span>
+                <span class="pill-success">✔ All {len(active_assignments):,} requests assigned exactly once</span>
                 <span class="pill-success">✔ Zero lost or duplicate requests</span>
-                <span class="pill-success">✔ Total workload strictly conserved (195,367 ms)</span>
+                <span class="pill-success">✔ Total workload strictly conserved ({total_active_ms:,} ms)</span>
                 <span class="pill-success">✔ Server workloads match assignment sums</span>
             </div>
             """,
@@ -917,10 +1404,21 @@ def main():
     st.markdown("---")
 
     # ---------------------------------------------------------
-    # 9. EXPORTS & DOWNLOAD BUTTONS
+    # 7. EXPORTS & DOWNLOAD BUTTONS
     # ---------------------------------------------------------
-    st.markdown("### 📥 6. Export Current Configuration Data")
-    st.markdown("Download assignment mapping files and performance comparisons matching the current server configuration:")
+    st.markdown(
+        """
+        <div id="section-7"></div>
+        <div class="section-header-box">
+            <h3 class="section-header-title">📥 7. Export Center & Research Artifacts</h3>
+            <span class="header-badge">CSV Data Export</span>
+        </div>
+        <div class="section-header-desc">
+            Download assignment mapping files and performance comparisons matching the current configuration.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     exp_col1, exp_col2, exp_col3, exp_col4 = st.columns(4)
     with exp_col1:
@@ -959,8 +1457,18 @@ def main():
     st.markdown("---")
 
     # ---------------------------------------------------------
-    # 10. SCIENTIFIC LIMITATION & EDUCATIONAL NOTES
+    # 8. SCIENTIFIC LIMITATION & EDUCATIONAL NOTES
     # ---------------------------------------------------------
+    st.markdown(
+        """
+        <div id="section-8"></div>
+        <div class="section-header-box">
+            <h3 class="section-header-title">📖 8. Scientific Limitations & Architectural Takeaways</h3>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     with st.expander("📖 Scientific Limitation & Educational Notes", expanded=True):
         st.markdown(
             r"""
